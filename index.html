@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skybound Adventurer - 2D Platformer</title>
+    <title>Skybound Adventurer - Level 2 Edition</title>
     <style>
         :root {
             --primary-color: #4facfe;
@@ -19,7 +18,7 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            user-select: none; /* Prevent text selection during play */
+            user-select: none;
         }
 
         body {
@@ -41,7 +40,9 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             border-radius: 8px;
             overflow: hidden;
-            background: linear-gradient(to bottom, #87CEEB, #E0F7FA); /* Sky background */
+            /* Default Sky (Day) - Will be modified by JS for Level 2 */
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA); 
+            transition: background 2s ease;
         }
 
         canvas {
@@ -144,10 +145,46 @@
             pointer-events: none;
             z-index: 5;
         }
+        
+        .hud-group {
+            display: flex;
+            gap: 20px;
+        }
+
+        /* Level Transition Notification */
+        #level-transition {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+        
+        #level-transition.active {
+            opacity: 1;
+        }
+
+        #level-title {
+            font-size: 4rem;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            transform: scale(0.5);
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        #level-transition.active #level-title {
+            transform: scale(1);
+        }
 
         /* Mobile Controls */
         #mobile-controls {
-            display: none; /* Hidden by default on desktop */
+            display: none;
             position: absolute;
             bottom: 20px;
             left: 0;
@@ -190,7 +227,7 @@
                 display: flex;
             }
             .controls-hint {
-                display: none; /* Hide keyboard hints on mobile */
+                display: none;
             }
         }
     </style>
@@ -198,25 +235,36 @@
 <body>
 
     <div id="game-wrapper">
-        <!-- The Game Canvas -->
         <canvas id="gameCanvas"></canvas>
 
         <!-- HUD -->
         <div id="hud">
-            <div id="score-display">Coins: 0</div>
+            <div class="hud-group">
+                <div id="level-display">Level: 1</div>
+                <div id="score-display">Coins: 0</div>
+            </div>
             <div id="lives-display">Lives: 3</div>
+        </div>
+
+        <!-- Level Transition Overlay -->
+        <div id="level-transition">
+            <h2 id="level-title">SUNSET HORIZON</h2>
+            <p>Level 2</p>
         </div>
 
         <!-- Start Screen -->
         <div id="start-screen" class="ui-layer">
             <h1>SKYBOUND ADVENTURER</h1>
-            <p>Jump over gaps, stomp enemies, and collect coins!</p>
+            <p>Master the skies in this 2-level adventure!</p>
             
             <div class="controls-hint">
                 <span><span class="key">←</span> <span class="key">→</span></span> <span>Move Left/Right</span>
                 <span><span class="key">Space</span> or <span class="key">↑</span></span> <span>Jump</span>
-                <span><span class="key">R</span></span> <span>Restart Level</span>
+                <span><span class="key">R</span></span> <span>Restart Game</span>
             </div>
+
+            <!-- New Orientation Hint -->
+            <p style="font-size: 0.9rem; color: #aaa; margin-bottom: 20px; font-style: italic;">Set your screen to horizontal for better experience</p>
 
             <button id="start-btn">PLAY NOW</button>
         </div>
@@ -230,8 +278,13 @@
 
         <!-- Victory Screen -->
         <div id="victory-screen" class="ui-layer hidden">
-            <h1 style="color: #ffd700; -webkit-text-fill-color: #ffd700;">LEVEL CLEARED!</h1>
-            <p>Great job! You reached the flag.</p>
+            <h1 style="color: #ffd700; -webkit-text-fill-color: #ffd700;">YOU WIN!</h1>
+            <p>Congratulations! You finished the game.</p>
+            <p id="victory-score">Total Coins: 0</p>
+            
+            <!-- Credits Line -->
+            <p style="font-size: 0.9rem; color: #ccc; margin-top: 15px; font-weight: bold;">made by keshav jha <3</p>
+            
             <button id="play-again-btn">PLAY AGAIN</button>
         </div>
 
@@ -248,24 +301,22 @@
 <script>
 /**
  * GAME ENGINE & LOGIC
- * 
- * This script handles:
- * 1. The Game Loop (Update & Draw)
- * 2. Physics (Gravity, Velocity, Collision)
- * 3. Entities (Player, Enemies, Platforms, Coins)
- * 4. Game State (Menu, Playing, GameOver, Victory)
  */
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const wrapper = document.getElementById('game-wrapper');
 
 // UI Elements
 const startScreen = document.getElementById('start-screen');
 const gameOverScreen = document.getElementById('game-over-screen');
 const victoryScreen = document.getElementById('victory-screen');
+const levelTransition = document.getElementById('level-transition');
 const scoreDisplay = document.getElementById('score-display');
 const livesDisplay = document.getElementById('lives-display');
+const levelDisplay = document.getElementById('level-display');
 const finalScoreText = document.getElementById('final-score');
+const victoryScoreText = document.getElementById('victory-score');
 
 // Game Constants
 const GRAVITY = 0.6;
@@ -273,9 +324,17 @@ const FRICTION = 0.8;
 const PLAYER_SPEED = 5;
 const JUMP_FORCE = 14;
 
-// Set canvas resolution (internal logic size)
+// Set canvas resolution
 canvas.width = 800;
 canvas.height = 450;
+
+// Game State
+let currentLevel = 1;
+let gameRunning = false;
+let score = 0;
+let lives = 3;
+let animationId;
+let cameraX = 0;
 
 // Input State
 const keys = {
@@ -283,13 +342,6 @@ const keys = {
     left: false,
     up: false
 };
-
-// Game State Variables
-let gameRunning = false;
-let score = 0;
-let lives = 3;
-let animationId;
-let cameraX = 0;
 
 /**
  * CLASSES
@@ -310,12 +362,14 @@ class Player {
         this.grounded = false;
         this.isDead = false;
         this.facingRight = true;
+        this.invulnerable = 0; // Frames of invincibility after hit
     }
 
     update() {
         if (this.isDead) return;
+        if (this.invulnerable > 0) this.invulnerable--;
 
-        // Movement Logic
+        // Movement
         if (keys.right) {
             this.vx += 1;
             this.facingRight = true;
@@ -325,26 +379,25 @@ class Player {
             this.facingRight = false;
         }
 
-        // Jump Logic
+        // Jump
         if (keys.up && this.grounded) {
             this.vy = -JUMP_FORCE;
             this.grounded = false;
             createParticles(this.x + this.width/2, this.y + this.height, '#fff', 5);
         }
 
-        // Physics Application
+        // Physics
         this.vx *= FRICTION;
         this.vy += GRAVITY;
-
-        // Cap speed
+        
+        // Speed Cap
         if(this.vx > PLAYER_SPEED) this.vx = PLAYER_SPEED;
         if(this.vx < -PLAYER_SPEED) this.vx = -PLAYER_SPEED;
 
-        // Apply Velocity
         this.x += this.vx;
         this.y += this.vy;
 
-        // Basic floor collision (bottom of screen) - instant death pit
+        // Death Pit
         if (this.y > canvas.height + 100) {
             die();
         }
@@ -352,15 +405,16 @@ class Player {
 
     draw() {
         if (this.isDead) return;
+        if (this.invulnerable > 0 && Math.floor(Date.now() / 50) % 2 === 0) return; // Blink effect
 
         ctx.save();
-        ctx.translate(-cameraX, 0); // Apply camera scroll
+        ctx.translate(-cameraX, 0);
         
-        // Draw Body (Blue Square)
+        // Draw Body - Fixed color for all levels
         ctx.fillStyle = '#4facfe';
         ctx.fillRect(this.x, this.y, this.width, this.height);
         
-        // Draw Eyes (to show direction)
+        // Eyes
         ctx.fillStyle = 'white';
         const eyeOffset = this.facingRight ? 18 : 4;
         ctx.fillRect(this.x + eyeOffset, this.y + 6, 8, 8);
@@ -368,11 +422,10 @@ class Player {
         const pupilOffset = this.facingRight ? 22 : 4;
         ctx.fillRect(this.x + pupilOffset, this.y + 8, 4, 4);
 
-        // Draw Scarf/Accessory for detail
+        // Scarf
         ctx.fillStyle = '#ff9a9e';
         ctx.fillRect(this.x + 4, this.y + 24, 24, 4);
         if (Math.abs(this.vx) > 1) {
-            // Animate scarf based on speed
             const scarfWave = Math.sin(Date.now() / 50) * 5;
             ctx.fillRect(this.x + (this.facingRight ? -10 : 30) + scarfWave, this.y + 24, 10, 4);
         }
@@ -393,15 +446,22 @@ class Platform {
         ctx.save();
         ctx.translate(-cameraX, 0);
         
-        // Grass top
-        ctx.fillStyle = '#4cd137';
-        ctx.fillRect(this.x, this.y, this.width, 10);
-        // Dirt body
-        ctx.fillStyle = '#8c7ae6'; // Stylish purple dirt
-        ctx.fillRect(this.x, this.y + 10, this.width, this.height - 10);
+        // Style changes based on level
+        if (currentLevel === 1) {
+            // Green Grass / Purple Dirt
+            ctx.fillStyle = '#4cd137';
+            ctx.fillRect(this.x, this.y, this.width, 10);
+            ctx.fillStyle = '#8c7ae6';
+            ctx.fillRect(this.x, this.y + 10, this.width, this.height - 10);
+        } else {
+            // Sunset Theme: Orange Top / Darker Red Dirt
+            ctx.fillStyle = '#e67e22';
+            ctx.fillRect(this.x, this.y, this.width, 10);
+            ctx.fillStyle = '#6c2a2a';
+            ctx.fillRect(this.x, this.y + 10, this.width, this.height - 10);
+        }
         
-        // Decorative border
-        ctx.strokeStyle = '#444';
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
         ctx.lineWidth = 2;
         ctx.strokeRect(this.x, this.y, this.width, this.height);
 
@@ -417,40 +477,34 @@ class Enemy {
         this.width = 30;
         this.height = 30;
         this.range = range;
-        this.speed = 2;
+        this.speed = 2; // Increased slightly for level 2 later
         this.direction = 1;
         this.vx = this.speed;
     }
 
     update() {
         this.x += this.vx;
-
-        // Patrol logic
-        if (this.x > this.startX + this.range) {
-            this.vx = -this.speed;
-        } else if (this.x < this.startX) {
-            this.vx = this.speed;
-        }
+        if (this.x > this.startX + this.range) this.vx = -this.speed;
+        else if (this.x < this.startX) this.vx = this.speed;
     }
 
     draw() {
         ctx.save();
         ctx.translate(-cameraX, 0);
 
-        // Slime body
+        // Enemy body (Spiky red blob)
         ctx.fillStyle = '#e84118';
         ctx.beginPath();
-        ctx.arc(this.x + this.width/2, this.y + this.height/2 + 5, this.width/2, Math.PI, 0); // Semi-circle top
+        ctx.arc(this.x + this.width/2, this.y + this.height/2 + 5, this.width/2, Math.PI, 0);
         ctx.lineTo(this.x + this.width, this.y + this.height);
         ctx.lineTo(this.x, this.y + this.height);
         ctx.fill();
 
-        // Angry Eyes
+        // Eyes
         ctx.fillStyle = 'white';
         ctx.fillRect(this.x + 5, this.y + 10, 8, 8);
         ctx.fillRect(this.x + 18, this.y + 10, 8, 8);
         ctx.fillStyle = 'black';
-        // Look towards direction
         const pupilDir = this.vx > 0 ? 2 : -2;
         ctx.fillRect(this.x + 7 + pupilDir, this.y + 12, 4, 4);
         ctx.fillRect(this.x + 20 + pupilDir, this.y + 12, 4, 4);
@@ -470,13 +524,11 @@ class Coin {
     }
 
     update() {
-        // Bobbing animation
         this.floatOffset += 0.1;
     }
 
     draw() {
         if (this.collected) return;
-
         const bobY = Math.sin(this.floatOffset) * 5;
 
         ctx.save();
@@ -487,7 +539,6 @@ class Coin {
         ctx.arc(this.x + 10, this.y + 10 + bobY, 10, 0, Math.PI * 2);
         ctx.fill();
         
-        // Shine effect
         ctx.fillStyle = '#fff';
         ctx.beginPath();
         ctx.arc(this.x + 7, this.y + 7 + bobY, 3, 0, Math.PI * 2);
@@ -509,11 +560,9 @@ class Flag {
         ctx.save();
         ctx.translate(-cameraX, 0);
 
-        // Pole
         ctx.fillStyle = '#bdc3c7';
         ctx.fillRect(this.x, this.y - 100, this.width, 100);
 
-        // Flag
         ctx.fillStyle = '#e1b12c';
         ctx.beginPath();
         ctx.moveTo(this.x + 10, this.y - 100);
@@ -551,7 +600,7 @@ class Particle {
 }
 
 /**
- * GAME DATA & SETUP
+ * GAME DATA
  */
 
 const player = new Player();
@@ -561,22 +610,31 @@ let coins = [];
 let particles = [];
 let flag;
 
-function initLevel() {
+function createCoinPath(startX, startY, count) {
+    for(let i=0; i<count; i++) {
+        coins.push(new Coin(startX + (i * 40), startY));
+    }
+}
+
+// --- LEVEL 1 DESIGN ---
+function initLevel1() {
+    wrapper.style.background = "linear-gradient(to bottom, #87CEEB, #E0F7FA)"; // Day
+
     platforms = [];
     enemies = [];
     coins = [];
     particles = [];
 
     // Ground segments
-    platforms.push(new Platform(0, 400, 1000, 50));  // Start area
-    platforms.push(new Platform(1200, 400, 600, 50)); // Gap 1
-    platforms.push(new Platform(1900, 350, 200, 50)); // High platform
-    platforms.push(new Platform(2200, 400, 800, 50)); // Long run
+    platforms.push(new Platform(0, 400, 1000, 50));
+    platforms.push(new Platform(1200, 400, 600, 50));
+    platforms.push(new Platform(1900, 350, 200, 50)); 
+    platforms.push(new Platform(2200, 400, 800, 50));
     
-    // Floating platforms
+    // Floating
     platforms.push(new Platform(2400, 280, 150, 20));
     platforms.push(new Platform(2700, 200, 150, 20));
-    platforms.push(new Platform(3000, 400, 1000, 50)); // Ground before enemies
+    platforms.push(new Platform(3000, 400, 1000, 50));
 
     // Steps
     platforms.push(new Platform(4100, 350, 100, 50));
@@ -591,21 +649,78 @@ function initLevel() {
 
     // Enemies
     enemies.push(new Enemy(1300, 370, 300));
-    enemies.push(new Enemy(1400, 370, 300));
     enemies.push(new Enemy(3000, 370, 600));
-    enemies.push(new Enemy(3300, 370, 600));
     enemies.push(new Enemy(4600, 370, 200));
 
     // Coins
-    createCoinPath(300, 350, 5); // First coins
-    createCoinPath(1950, 300, 5); // High platform
-    createCoinPath(2750, 150, 5); // High jump
-    createCoinPath(2400, 230, 3); // Floating
+    createCoinPath(300, 350, 5);
+    createCoinPath(1950, 300, 5);
+    createCoinPath(2750, 150, 5);
+    createCoinPath(2400, 230, 3);
 }
 
-function createCoinPath(startX, startY, count) {
-    for(let i=0; i<count; i++) {
-        coins.push(new Coin(startX + (i * 40), startY));
+// --- LEVEL 2 DESIGN ---
+function initLevel2() {
+    // Sunset Theme
+    wrapper.style.background = "linear-gradient(to bottom, #ff7e5f, #feb47b)";
+
+    platforms = [];
+    enemies = [];
+    coins = [];
+    particles = [];
+
+    // Start Platform (floating)
+    platforms.push(new Platform(0, 300, 300, 20));
+
+    // Series of small floating islands (Precision jumping)
+    platforms.push(new Platform(400, 350, 80, 20));
+    platforms.push(new Platform(550, 250, 80, 20));
+    platforms.push(new Platform(700, 350, 80, 20));
+    platforms.push(new Platform(850, 250, 80, 20));
+    
+    // Larger landing area with enemy
+    platforms.push(new Platform(1000, 400, 400, 50));
+    enemies.push(new Enemy(1100, 370, 200));
+    enemies.push(new Enemy(1250, 370, 100)); // Second enemy blocking path
+
+    // Vertical climb
+    platforms.push(new Platform(1450, 320, 100, 20));
+    platforms.push(new Platform(1300, 240, 100, 20));
+    platforms.push(new Platform(1450, 160, 100, 20));
+
+    // The "Gap of Doom" - Long jump with moving coin
+    platforms.push(new Platform(1700, 400, 200, 50));
+    coins.push(new Coin(1650, 200)); // Risky coin mid-air
+
+    // Enemy gauntlet
+    platforms.push(new Platform(2000, 400, 800, 50));
+    enemies.push(new Enemy(2100, 370, 400));
+    enemies.push(new Enemy(2500, 370, 400));
+
+    // Stairs to Flag
+    platforms.push(new Platform(2900, 350, 80, 50));
+    platforms.push(new Platform(3000, 300, 80, 50));
+    platforms.push(new Platform(3100, 250, 80, 50));
+    platforms.push(new Platform(3200, 200, 80, 50));
+
+    // Final Platform
+    platforms.push(new Platform(3300, 400, 500, 50));
+    
+    // Flag
+    flag = new Flag(3700, 400);
+
+    // Coins in dangerous places
+    createCoinPath(410, 300, 2);
+    createCoinPath(560, 200, 2);
+    createCoinPath(1460, 120, 3); // Top of vertical climb
+    createCoinPath(2400, 350, 5); // Over enemies
+}
+
+function initLevel() {
+    if (currentLevel === 1) {
+        initLevel1();
+    } else {
+        initLevel2();
     }
 }
 
@@ -620,15 +735,13 @@ function createParticles(x, y, color, count) {
 }
 
 function checkCollisions() {
-    // Platform Collisions
     player.grounded = false;
+    
     for (let p of platforms) {
-        // Simple AABB collision
-        // We check if player is falling into the platform
         if (player.x < p.x + p.width &&
             player.x + player.width > p.x &&
             player.y + player.height > p.y &&
-            player.y + player.height < p.y + p.height + 20 /* Tolerance */ &&
+            player.y + player.height < p.y + p.height + 20 &&
             player.vy >= 0) {
                 
                 player.grounded = true;
@@ -637,24 +750,24 @@ function checkCollisions() {
         }
     }
 
-    // Enemy Collisions
     for (let e of enemies) {
         if (rectIntersect(player.x, player.y, player.width, player.height, e.x, e.y, e.width, e.height)) {
-            // Mario logic: If falling from above, kill enemy. Otherwise, player dies.
             if (player.vy > 0 && player.y + player.height < e.y + e.height / 2 + 10) {
-                // Kill enemy
-                e.x = -9999; // Move off screen
-                player.vy = -10; // Bounce
+                // Kill Enemy
+                e.x = -9999;
+                player.vy = -10;
                 score += 50;
                 scoreDisplay.innerText = "Coins: " + score;
                 createParticles(player.x, player.y + player.height, '#e84118', 10);
             } else {
-                die();
+                // Hit Player
+                if (player.invulnerable === 0) {
+                    die();
+                }
             }
         }
     }
 
-    // Coin Collisions
     for (let c of coins) {
         if (!c.collected && 
             rectIntersect(player.x, player.y, player.width, player.height, c.x, c.y, c.width, c.height)) {
@@ -665,7 +778,7 @@ function checkCollisions() {
         }
     }
 
-    // Flag Collision (Victory)
+    // Victory Logic
     if (rectIntersect(player.x, player.y, player.width, player.height, flag.x, flag.y - 100, flag.width + 60, flag.height)) {
         victory();
     }
@@ -680,10 +793,9 @@ function die() {
     livesDisplay.innerText = "Lives: " + lives;
     
     if (lives > 0) {
-        // Respawn logic
         player.reset();
-        // Adjust camera back
-        cameraX = 0;
+        player.invulnerable = 60; // 1 second invulnerability
+        cameraX = 0; // Reset camera
     } else {
         gameOver();
     }
@@ -696,11 +808,38 @@ function gameOver() {
 }
 
 function victory() {
-    gameRunning = false;
-    victoryScreen.classList.remove('hidden');
+    if (currentLevel === 1) {
+        // Transition to Level 2
+        gameRunning = false;
+        showTransition();
+    } else {
+        // Game Fully Beaten
+        gameRunning = false;
+        victoryScoreText.innerText = "Total Coins: " + score;
+        victoryScreen.classList.remove('hidden');
+    }
+}
+
+function showTransition() {
+    levelTransition.classList.add('active');
+    setTimeout(() => {
+        currentLevel = 2;
+        levelDisplay.innerText = "Level: 2";
+        startLevel2();
+        levelTransition.classList.remove('active');
+    }, 2500);
+}
+
+function startLevel2() {
+    player.reset();
+    initLevel();
+    cameraX = 0;
+    gameRunning = true;
 }
 
 function resetGame() {
+    currentLevel = 1;
+    levelDisplay.innerText = "Level: 1";
     score = 0;
     lives = 3;
     scoreDisplay.innerText = "Coins: 0";
@@ -715,7 +854,6 @@ function resetGame() {
     gameOverScreen.classList.add('hidden');
     victoryScreen.classList.add('hidden');
 
-    // Start Loop if not running
     if (!animationId) {
         gameLoop();
     }
@@ -729,14 +867,9 @@ function update() {
     if (!gameRunning) return;
 
     player.update();
-    
-    // Update enemies
     enemies.forEach(e => e.update());
-    
-    // Update coins (animation)
     coins.forEach(c => c.update());
     
-    // Update particles
     particles.forEach((p, index) => {
         p.update();
         if (p.life <= 0) particles.splice(index, 1);
@@ -744,25 +877,21 @@ function update() {
 
     checkCollisions();
 
-    // Camera Logic (Keep player in left 1/3 of screen)
-    // Smooth camera interpolation could go here, but direct assignment is snappier
     let targetCamX = player.x - canvas.width / 3;
-    
-    // Clamp camera so it doesn't show left of 0
     if (targetCamX < 0) targetCamX = 0;
     
-    // Clamp camera so it doesn't go past end (approximate)
-    if (targetCamX > 5000) targetCamX = 5000;
+    // Dynamic clamp for level length
+    let maxCam = currentLevel === 1 ? 5000 : 3500;
+    if (targetCamX > maxCam) targetCamX = maxCam;
 
     cameraX = targetCamX;
 }
 
 function draw() {
-    // Clear Canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    // Background clouds (parallax effect)
+    // Parallax Clouds (Change color slightly based on level? Keeping simple for now)
     ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
     ctx.beginPath();
     ctx.arc(100 - (cameraX * 0.2) % 900, 100, 40, 0, Math.PI*2);
@@ -775,7 +904,6 @@ function draw() {
     ctx.fill();
     ctx.restore();
 
-    // Draw Game Objects
     flag.draw();
     platforms.forEach(p => p.draw());
     coins.forEach(c => c.draw());
@@ -794,12 +922,11 @@ function gameLoop() {
  * EVENT LISTENERS
  */
 
-// Keyboard
 window.addEventListener('keydown', e => {
     if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
     if (e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') keys.up = true;
-    if (e.code === 'KeyR' && !gameRunning) resetGame();
+    if (e.code === 'KeyR' && !gameRunning && startScreen.classList.contains('hidden')) resetGame();
 });
 
 window.addEventListener('keyup', e => {
@@ -808,7 +935,6 @@ window.addEventListener('keyup', e => {
     if (e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') keys.up = false;
 });
 
-// Touch (Mobile)
 const btnLeft = document.getElementById('btn-left');
 const btnRight = document.getElementById('btn-right');
 const btnJump = document.getElementById('btn-jump');
@@ -822,17 +948,14 @@ addTouch(btnLeft, 'ArrowLeft');
 addTouch(btnRight, 'ArrowRight');
 addTouch(btnJump, 'Space');
 
-// UI Buttons
 document.getElementById('start-btn').addEventListener('click', resetGame);
 document.getElementById('restart-btn').addEventListener('click', resetGame);
 document.getElementById('play-again-btn').addEventListener('click', resetGame);
 
-// Initial Draw
+// Init
 initLevel();
 draw();
 
 </script>
 </body>
 </html>
-
-
