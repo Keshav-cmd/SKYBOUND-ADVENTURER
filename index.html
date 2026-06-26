@@ -3,24 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skybound Adventurer - Level 2 Edition</title>
+    <title>Skybound Adventurer - v2</title>
     <style>
         :root {
             --primary-color: #4facfe;
             --secondary-color: #00f2fe;
             --accent-color: #ff9a9e;
             --text-color: #ffffff;
-            --bg-color: #1a1a2e;
-            --ui-bg: rgba(22, 33, 62, 0.9);
+            --bg-color: #0a0a1a;
+            --ui-bg: rgba(10, 10, 30, 0.93);
         }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            user-select: none;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--bg-color);
@@ -31,564 +24,576 @@
             min-height: 100vh;
             overflow: hidden;
         }
-
-        /* Main Game Container */
         #game-wrapper {
             position: relative;
             width: 800px;
             height: 450px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
             border-radius: 8px;
             overflow: hidden;
-            /* Default Sky (Day) - Will be modified by JS for Level 2 */
-            background: linear-gradient(to bottom, #87CEEB, #E0F7FA); 
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
             transition: background 2s ease;
         }
+        canvas { display: block; width: 100%; height: 100%; }
 
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-
-        /* UI Overlay Layer */
         .ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background: var(--ui-bg);
-            transition: opacity 0.3s ease;
-            z-index: 10;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: var(--ui-bg); transition: opacity 0.3s ease; z-index: 10;
         }
-
-        .hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
+        .hidden { opacity: 0; pointer-events: none; }
 
         h1 {
-            font-size: 3rem;
-            margin-bottom: 10px;
+            font-size: 3rem; margin-bottom: 10px;
             text-shadow: 2px 2px 0px #000;
             background: -webkit-linear-gradient(var(--primary-color), var(--secondary-color));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
-
-        p {
-            font-size: 1.2rem;
-            margin-bottom: 20px;
-            color: #ddd;
-        }
+        p { font-size: 1.1rem; margin-bottom: 15px; color: #ddd; }
 
         .controls-hint {
-            display: grid;
-            grid-template-columns: auto auto;
-            gap: 15px;
-            margin-bottom: 30px;
-            text-align: left;
-            background: rgba(255,255,255,0.1);
-            padding: 15px;
-            border-radius: 8px;
+            display: grid; grid-template-columns: auto auto; gap: 12px;
+            margin-bottom: 25px; text-align: left;
+            background: rgba(255,255,255,0.08); padding: 14px; border-radius: 8px;
         }
-
         .key {
-            background: #eee;
-            color: #333;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-weight: bold;
-            font-family: monospace;
+            background: #eee; color: #333; padding: 3px 8px;
+            border-radius: 4px; font-weight: bold; font-family: monospace;
             box-shadow: 0 2px 0 #999;
         }
-
         button {
-            padding: 12px 30px;
-            font-size: 1.2rem;
+            padding: 12px 30px; font-size: 1.2rem;
             background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
-            border: none;
-            border-radius: 50px;
-            color: white;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0, 242, 254, 0.4);
+            border: none; border-radius: 50px; color: white; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,242,254,0.4);
             transition: transform 0.1s, box-shadow 0.1s;
         }
+        button:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(0,242,254,0.6); }
+        button:active { transform: scale(0.95); }
 
-        button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 20px rgba(0, 242, 254, 0.6);
-        }
-
-        button:active {
-            transform: scale(0.95);
-        }
-
-        /* HUD (Heads Up Display) */
+        /* HUD */
         #hud {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            display: flex;
-            justify-content: space-between;
-            font-family: monospace;
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #fff;
-            text-shadow: 2px 2px 0 #000;
-            pointer-events: none;
-            z-index: 5;
+            position: absolute; top: 10px; left: 10px; right: 10px;
+            display: flex; justify-content: space-between;
+            font-family: monospace; font-size: 1.3rem; font-weight: bold;
+            color: #fff; text-shadow: 2px 2px 0 #000;
+            pointer-events: none; z-index: 5;
         }
-        
-        .hud-group {
-            display: flex;
-            gap: 20px;
-        }
+        .hud-group { display: flex; gap: 20px; align-items: center; }
+        #hearts-display { font-size: 1.2rem; letter-spacing: 2px; }
 
-        /* Level Transition Notification */
+        /* Level Transition */
         #level-transition {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 20;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.5s;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 20;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.5s;
         }
-        
-        #level-transition.active {
-            opacity: 1;
-        }
-
+        #level-transition.active { opacity: 1; pointer-events: auto; }
         #level-title {
-            font-size: 4rem;
-            color: #ffd700;
-            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            font-size: 4rem; color: #ffd700;
+            text-shadow: 0 0 30px rgba(255,215,0,0.7);
             transform: scale(0.5);
             transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            margin-bottom: 8px;
         }
-        
-        #level-transition.active #level-title {
-            transform: scale(1);
-        }
+        #level-transition.active #level-title { transform: scale(1); }
+        #level-subtitle { font-size: 1.4rem; color: #ccc; }
+        #level-bonus { font-size: 1rem; color: #88ff88; margin-top: 10px; }
 
-        /* Mobile Controls */
+        /* Mobile */
         #mobile-controls {
-            display: none;
-            position: absolute;
-            bottom: 20px;
-            left: 0;
-            width: 100%;
-            padding: 0 20px;
-            justify-content: space-between;
-            z-index: 8;
+            display: none; position: absolute; bottom: 20px; left: 0;
+            width: 100%; padding: 0 20px; justify-content: space-between; z-index: 8;
         }
-
         .touch-btn {
-            width: 60px;
-            height: 60px;
-            background: rgba(255,255,255,0.3);
-            border: 2px solid white;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 24px;
-            color: white;
-            user-select: none;
+            width: 60px; height: 60px; background: rgba(255,255,255,0.25);
+            border: 2px solid white; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 24px; color: white;
         }
-
-        .touch-btn:active {
-            background: rgba(255,255,255,0.6);
-        }
-
-        .d-pad {
-            display: flex;
-            gap: 15px;
-        }
+        .touch-btn:active { background: rgba(255,255,255,0.55); }
+        .d-pad { display: flex; gap: 15px; }
 
         @media (max-width: 850px) {
-            #game-wrapper {
-                width: 100%;
-                height: 100vh;
-                border-radius: 0;
-            }
-            #mobile-controls {
-                display: flex;
-            }
-            .controls-hint {
-                display: none;
-            }
+            #game-wrapper { width: 100%; height: 100vh; border-radius: 0; }
+            #mobile-controls { display: flex; }
+            .controls-hint { display: none; }
         }
     </style>
 </head>
 <body>
+<div id="game-wrapper">
+    <canvas id="gameCanvas"></canvas>
 
-    <div id="game-wrapper">
-        <canvas id="gameCanvas"></canvas>
-
-        <!-- HUD -->
-        <div id="hud">
-            <div class="hud-group">
-                <div id="level-display">Level: 1</div>
-                <div id="score-display">Coins: 0</div>
-            </div>
-            <div id="lives-display">Lives: 3</div>
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-group">
+            <div id="level-display">Level: 1</div>
+            <div id="score-display">Coins: 0</div>
         </div>
-
-        <!-- Level Transition Overlay -->
-        <div id="level-transition">
-            <h2 id="level-title">SUNSET HORIZON</h2>
-            <p>Level 2</p>
-        </div>
-
-        <!-- Start Screen -->
-        <div id="start-screen" class="ui-layer">
-            <h1>SKYBOUND ADVENTURER</h1>
-            <p>Master the skies in this 2-level adventure!</p>
-            
-            <div class="controls-hint">
-                <span><span class="key">←</span> <span class="key">→</span></span> <span>Move Left/Right</span>
-                <span><span class="key">Space</span> or <span class="key">↑</span></span> <span>Jump</span>
-                <span><span class="key">R</span></span> <span>Restart Game</span>
-            </div>
-
-            <!-- New Orientation Hint -->
-            <p style="font-size: 0.9rem; color: #aaa; margin-bottom: 20px; font-style: italic;">Set your screen to horizontal for better experience</p>
-
-            <button id="start-btn">PLAY NOW</button>
-        </div>
-
-        <!-- Game Over Screen -->
-        <div id="game-over-screen" class="ui-layer hidden">
-            <h1 style="color: #ff6b6b; -webkit-text-fill-color: #ff6b6b;">GAME OVER</h1>
-            <p id="final-score">You collected 0 coins.</p>
-            <button id="restart-btn">TRY AGAIN</button>
-        </div>
-
-        <!-- Victory Screen -->
-        <div id="victory-screen" class="ui-layer hidden">
-            <h1 style="color: #ffd700; -webkit-text-fill-color: #ffd700;">YOU WIN!</h1>
-            <p>Congratulations! You finished the game.</p>
-            <p id="victory-score">Total Coins: 0</p>
-            
-            <!-- Credits Line -->
-            <p style="font-size: 0.9rem; color: #ccc; margin-top: 15px; font-weight: bold;">made by keshav jha <3</p>
-            
-            <button id="play-again-btn">PLAY AGAIN</button>
-        </div>
-
-        <!-- Mobile Controls -->
-        <div id="mobile-controls">
-            <div class="d-pad">
-                <div class="touch-btn" id="btn-left">←</div>
-                <div class="touch-btn" id="btn-right">→</div>
-            </div>
-            <div class="touch-btn" id="btn-jump">↑</div>
-        </div>
+        <div id="hearts-display">❤️❤️❤️</div>
     </div>
 
-<script>
-/**
- * GAME ENGINE & LOGIC
- */
+    <!-- Level Transition -->
+    <div id="level-transition">
+        <h2 id="level-title">SUNSET HORIZON</h2>
+        <p id="level-subtitle">Level 2</p>
+        <p id="level-bonus"></p>
+    </div>
 
+    <!-- Start Screen -->
+    <div id="start-screen" class="ui-layer">
+        <h1>SKYBOUND ADVENTURER</h1>
+        <p>A 3-level sky adventure! Reach the flag each level.</p>
+        <div class="controls-hint">
+            <span><span class="key">←</span> <span class="key">→</span></span> <span>Move</span>
+            <span><span class="key">Space</span> / <span class="key">↑</span></span> <span>Jump</span>
+            <span><span class="key">R</span></span> <span>Restart (after game over)</span>
+        </div>
+        <p style="font-size:0.85rem;color:#aaa;margin-bottom:18px;font-style:italic;">Tip: Stomp enemies to defeat them. Tanky enemies need 2 stomps!</p>
+        <button id="start-btn">PLAY NOW</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="ui-layer hidden">
+        <h1 style="color:#ff6b6b;-webkit-text-fill-color:#ff6b6b;">GAME OVER</h1>
+        <p id="final-score">You collected 0 coins.</p>
+        <button id="restart-btn">TRY AGAIN</button>
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="victory-screen" class="ui-layer hidden">
+        <h1 style="color:#ffd700;-webkit-text-fill-color:#ffd700;">🏆 YOU WIN!</h1>
+        <p>You conquered all 3 levels!</p>
+        <p id="victory-score">Total Coins: 0</p>
+        <p style="font-size:0.85rem;color:#ccc;margin-top:12px;font-weight:bold;">made by keshav jha ♥</p>
+        <button id="play-again-btn" style="margin-top:18px;">PLAY AGAIN</button>
+    </div>
+
+    <!-- Mobile Controls -->
+    <div id="mobile-controls">
+        <div class="d-pad">
+            <div class="touch-btn" id="btn-left">←</div>
+            <div class="touch-btn" id="btn-right">→</div>
+        </div>
+        <div class="touch-btn" id="btn-jump">↑</div>
+    </div>
+</div>
+
+<script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const wrapper = document.getElementById('game-wrapper');
 
-// UI Elements
-const startScreen = document.getElementById('start-screen');
-const gameOverScreen = document.getElementById('game-over-screen');
-const victoryScreen = document.getElementById('victory-screen');
-const levelTransition = document.getElementById('level-transition');
-const scoreDisplay = document.getElementById('score-display');
-const livesDisplay = document.getElementById('lives-display');
-const levelDisplay = document.getElementById('level-display');
-const finalScoreText = document.getElementById('final-score');
+const startScreen      = document.getElementById('start-screen');
+const gameOverScreen   = document.getElementById('game-over-screen');
+const victoryScreen    = document.getElementById('victory-screen');
+const levelTransition  = document.getElementById('level-transition');
+const scoreDisplay     = document.getElementById('score-display');
+const heartsDisplay    = document.getElementById('hearts-display');
+const levelDisplay     = document.getElementById('level-display');
+const finalScoreText   = document.getElementById('final-score');
 const victoryScoreText = document.getElementById('victory-score');
+const levelTitle       = document.getElementById('level-title');
+const levelSubtitle    = document.getElementById('level-subtitle');
+const levelBonus       = document.getElementById('level-bonus');
 
-// Game Constants
-const GRAVITY = 0.6;
-const FRICTION = 0.8;
-const PLAYER_SPEED = 5;
-const JUMP_FORCE = 14;
-
-// Set canvas resolution
-canvas.width = 800;
+canvas.width  = 800;
 canvas.height = 450;
 
-// Game State
+const GRAVITY      = 0.6;
+const FRICTION     = 0.8;
+const PLAYER_SPEED = 5;
+const JUMP_FORCE   = 14;
+
 let currentLevel = 1;
-let gameRunning = false;
-let score = 0;
-let lives = 3;
+let gameRunning  = false;
+let score        = 0;
+let maxHearts    = 3;
+let hearts       = 3;
 let animationId;
-let cameraX = 0;
+let cameraX      = 0;
+let stars        = [];
 
-// Input State
-const keys = {
-    right: false,
-    left: false,
-    up: false
-};
+const keys = { right: false, left: false, up: false };
 
-/**
- * CLASSES
- */
-
-class Player {
-    constructor() {
-        this.width = 32;
-        this.height = 32;
-        this.reset();
+/* ─── STAR FIELD (level 3) ─────────────────────── */
+function generateStars() {
+    stars = [];
+    for (let i = 0; i < 120; i++) {
+        stars.push({
+            x: Math.random() * 5000,
+            y: Math.random() * canvas.height,
+            r: Math.random() * 1.8 + 0.3,
+            speed: Math.random() * 0.3 + 0.05,
+            brightness: Math.random()
+        });
     }
+}
 
+function drawStars() {
+    stars.forEach(s => {
+        const twinkle = 0.5 + 0.5 * Math.sin(Date.now() / 300 + s.brightness * 10);
+        ctx.save();
+        ctx.globalAlpha = 0.6 + 0.4 * twinkle;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(s.x - cameraX * s.speed, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    });
+}
+
+function drawNebula() {
+    // Two soft nebula blobs
+    const nb = [
+        { x: 200,  y: 150, r: 180, c1: 'rgba(100,0,200,0.12)', c2: 'rgba(0,50,200,0)' },
+        { x: 600,  y: 280, r: 140, c1: 'rgba(200,0,100,0.10)', c2: 'rgba(0,0,0,0)' },
+        { x: 1200, y: 200, r: 220, c1: 'rgba(0,100,220,0.13)', c2: 'rgba(0,0,0,0)' },
+        { x: 2000, y: 120, r: 160, c1: 'rgba(150,0,200,0.11)', c2: 'rgba(0,0,0,0)' },
+        { x: 3000, y: 200, r: 200, c1: 'rgba(0,150,200,0.10)', c2: 'rgba(0,0,0,0)' },
+    ];
+    nb.forEach(n => {
+        const gx = n.x - cameraX * 0.15;
+        const grad = ctx.createRadialGradient(gx, n.y, 0, gx, n.y, n.r);
+        grad.addColorStop(0, n.c1);
+        grad.addColorStop(1, n.c2);
+        ctx.beginPath();
+        ctx.arc(gx, n.y, n.r, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+    });
+}
+
+/* ─── HEARTS DISPLAY ───────────────────────────── */
+function updateHeartsDisplay() {
+    let h = '';
+    for (let i = 0; i < maxHearts; i++) {
+        h += i < hearts ? '❤️' : '🖤';
+    }
+    heartsDisplay.innerText = h;
+}
+
+/* ─── PLAYER ───────────────────────────────────── */
+class Player {
+    constructor() { this.width = 32; this.height = 32; this.reset(); }
     reset() {
-        this.x = 100;
-        this.y = 200;
-        this.vx = 0;
-        this.vy = 0;
+        this.x = 100; this.y = 200;
+        this.vx = 0; this.vy = 0;
         this.grounded = false;
         this.isDead = false;
         this.facingRight = true;
-        this.invulnerable = 0; // Frames of invincibility after hit
+        this.invulnerable = 0;
     }
-
     update() {
         if (this.isDead) return;
         if (this.invulnerable > 0) this.invulnerable--;
-
-        // Movement
-        if (keys.right) {
-            this.vx += 1;
-            this.facingRight = true;
-        }
-        if (keys.left) {
-            this.vx -= 1;
-            this.facingRight = false;
-        }
-
-        // Jump
+        if (keys.right) { this.vx += 1; this.facingRight = true; }
+        if (keys.left)  { this.vx -= 1; this.facingRight = false; }
         if (keys.up && this.grounded) {
             this.vy = -JUMP_FORCE;
             this.grounded = false;
             createParticles(this.x + this.width/2, this.y + this.height, '#fff', 5);
         }
-
-        // Physics
         this.vx *= FRICTION;
         this.vy += GRAVITY;
-        
-        // Speed Cap
-        if(this.vx > PLAYER_SPEED) this.vx = PLAYER_SPEED;
-        if(this.vx < -PLAYER_SPEED) this.vx = -PLAYER_SPEED;
-
+        if (this.vx >  PLAYER_SPEED) this.vx =  PLAYER_SPEED;
+        if (this.vx < -PLAYER_SPEED) this.vx = -PLAYER_SPEED;
         this.x += this.vx;
         this.y += this.vy;
-
-        // Death Pit
-        if (this.y > canvas.height + 100) {
-            die();
-        }
+        if (this.y > canvas.height + 100) die();
     }
-
     draw() {
         if (this.isDead) return;
-        if (this.invulnerable > 0 && Math.floor(Date.now() / 50) % 2 === 0) return; // Blink effect
-
+        if (this.invulnerable > 0 && Math.floor(Date.now()/50) % 2 === 0) return;
         ctx.save();
         ctx.translate(-cameraX, 0);
-        
-        // Draw Body - Fixed color for all levels
+        // Body
         ctx.fillStyle = '#4facfe';
         ctx.fillRect(this.x, this.y, this.width, this.height);
-        
         // Eyes
         ctx.fillStyle = 'white';
-        const eyeOffset = this.facingRight ? 18 : 4;
-        ctx.fillRect(this.x + eyeOffset, this.y + 6, 8, 8);
+        const eyeX = this.facingRight ? 18 : 4;
+        ctx.fillRect(this.x + eyeX, this.y + 6, 8, 8);
         ctx.fillStyle = 'black';
-        const pupilOffset = this.facingRight ? 22 : 4;
-        ctx.fillRect(this.x + pupilOffset, this.y + 8, 4, 4);
-
+        const pupX = this.facingRight ? 22 : 4;
+        ctx.fillRect(this.x + pupX, this.y + 8, 4, 4);
         // Scarf
         ctx.fillStyle = '#ff9a9e';
         ctx.fillRect(this.x + 4, this.y + 24, 24, 4);
         if (Math.abs(this.vx) > 1) {
-            const scarfWave = Math.sin(Date.now() / 50) * 5;
-            ctx.fillRect(this.x + (this.facingRight ? -10 : 30) + scarfWave, this.y + 24, 10, 4);
+            const w = Math.sin(Date.now()/50) * 5;
+            ctx.fillRect(this.x + (this.facingRight ? -10 : 30) + w, this.y + 24, 10, 4);
         }
-
+        // Space helmet tint in level 3
+        if (currentLevel === 3) {
+            ctx.strokeStyle = 'rgba(150,220,255,0.5)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.x + 2, this.y + 2, this.width - 4, this.height/2);
+        }
         ctx.restore();
     }
 }
 
+/* ─── PLATFORM ─────────────────────────────────── */
 class Platform {
-    constructor(x, y, w, h) {
-        this.x = x;
-        this.y = y;
-        this.width = w;
-        this.height = h;
+    constructor(x, y, w, h, type) {
+        this.x = x; this.y = y;
+        this.width = w; this.height = h;
+        this.type = type || 'normal'; // 'normal' | 'crumble' | 'moving'
+        this.crumbleTimer = 0;
+        this.alive = true;
+        // moving platform
+        this.startX = x; this.moveRange = 0; this.moveSpeed = 0; this.moveDir = 1;
     }
-
+    update() {
+        if (this.type === 'crumble' && this.crumbleTimer > 0) {
+            this.crumbleTimer--;
+            if (this.crumbleTimer <= 0) { this.alive = false; }
+        }
+        if (this.type === 'moving') {
+            this.x += this.moveSpeed * this.moveDir;
+            if (this.x > this.startX + this.moveRange || this.x < this.startX) {
+                this.moveDir *= -1;
+            }
+        }
+    }
     draw() {
+        if (!this.alive) return;
         ctx.save();
         ctx.translate(-cameraX, 0);
-        
-        // Style changes based on level
+        let alpha = 1;
+        if (this.type === 'crumble' && this.crumbleTimer > 0) {
+            alpha = this.crumbleTimer / 80;
+            // shake
+            ctx.translate(Math.random() * 3 - 1.5, 0);
+        }
+        ctx.globalAlpha = alpha;
+
         if (currentLevel === 1) {
-            // Green Grass / Purple Dirt
             ctx.fillStyle = '#4cd137';
             ctx.fillRect(this.x, this.y, this.width, 10);
             ctx.fillStyle = '#8c7ae6';
             ctx.fillRect(this.x, this.y + 10, this.width, this.height - 10);
-        } else {
-            // Sunset Theme: Orange Top / Darker Red Dirt
+        } else if (currentLevel === 2) {
             ctx.fillStyle = '#e67e22';
             ctx.fillRect(this.x, this.y, this.width, 10);
             ctx.fillStyle = '#6c2a2a';
             ctx.fillRect(this.x, this.y + 10, this.width, this.height - 10);
+        } else {
+            // Space: glowing neon asteroid platforms
+            if (this.type === 'crumble') {
+                ctx.fillStyle = '#ff4444';
+                ctx.fillRect(this.x, this.y, this.width, 8);
+                ctx.fillStyle = '#550000';
+                ctx.fillRect(this.x, this.y + 8, this.width, this.height - 8);
+            } else if (this.type === 'moving') {
+                ctx.fillStyle = '#44ffdd';
+                ctx.fillRect(this.x, this.y, this.width, 8);
+                ctx.fillStyle = '#004444';
+                ctx.fillRect(this.x, this.y + 8, this.width, this.height - 8);
+            } else {
+                ctx.fillStyle = '#7b5cfa';
+                ctx.fillRect(this.x, this.y, this.width, 8);
+                ctx.fillStyle = '#1a0533';
+                ctx.fillRect(this.x, this.y + 8, this.width, this.height - 8);
+            }
+            // Glow edge
+            ctx.shadowColor = this.type === 'crumble' ? '#ff4444' : this.type === 'moving' ? '#44ffdd' : '#7b5cfa';
+            ctx.shadowBlur  = 8;
+            ctx.strokeStyle = ctx.shadowColor;
+            ctx.lineWidth   = 1;
+            ctx.strokeRect(this.x, this.y, this.width, 8);
+            ctx.shadowBlur = 0;
         }
-        
-        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+        ctx.lineWidth = 1.5;
         ctx.strokeRect(this.x, this.y, this.width, this.height);
-
         ctx.restore();
     }
 }
 
+/* ─── ENEMY ────────────────────────────────────── */
 class Enemy {
-    constructor(x, y, range) {
-        this.startX = x;
-        this.x = x;
-        this.y = y;
-        this.width = 30;
-        this.height = 30;
-        this.range = range;
-        this.speed = 2; // Increased slightly for level 2 later
-        this.direction = 1;
-        this.vx = this.speed;
+    constructor(x, y, range, tanky) {
+        this.startX  = x;
+        this.x       = x;
+        this.y       = y;
+        this.width   = tanky ? 38 : 30;
+        this.height  = tanky ? 38 : 30;
+        this.range   = range;
+        this.tanky   = tanky || false;
+        this.hp      = tanky ? 2 : 1;
+        this.speed   = tanky ? 1.5 : 2;
+        this.vx      = this.speed;
+        this.hitFlash = 0;
     }
-
     update() {
         this.x += this.vx;
-        if (this.x > this.startX + this.range) this.vx = -this.speed;
-        else if (this.x < this.startX) this.vx = this.speed;
+        if (this.x > this.startX + this.range || this.x < this.startX) this.vx *= -1;
+        if (this.hitFlash > 0) this.hitFlash--;
     }
-
     draw() {
+        if (this.hp <= 0) return;
         ctx.save();
         ctx.translate(-cameraX, 0);
 
-        // Enemy body (Spiky red blob)
-        ctx.fillStyle = '#e84118';
-        ctx.beginPath();
-        ctx.arc(this.x + this.width/2, this.y + this.height/2 + 5, this.width/2, Math.PI, 0);
-        ctx.lineTo(this.x + this.width, this.y + this.height);
-        ctx.lineTo(this.x, this.y + this.height);
-        ctx.fill();
+        const flash = this.hitFlash > 0;
 
-        // Eyes
-        ctx.fillStyle = 'white';
-        ctx.fillRect(this.x + 5, this.y + 10, 8, 8);
-        ctx.fillRect(this.x + 18, this.y + 10, 8, 8);
-        ctx.fillStyle = 'black';
-        const pupilDir = this.vx > 0 ? 2 : -2;
-        ctx.fillRect(this.x + 7 + pupilDir, this.y + 12, 4, 4);
-        ctx.fillRect(this.x + 20 + pupilDir, this.y + 12, 4, 4);
-
+        if (currentLevel === 3 && this.tanky) {
+            // SPACE BOSS MOB — armoured UFO
+            ctx.fillStyle = flash ? '#ffffff' : '#cc00ff';
+            ctx.beginPath();
+            ctx.ellipse(this.x + this.width/2, this.y + this.height/2 + 5, this.width/2, this.height/3, 0, 0, Math.PI*2);
+            ctx.fill();
+            // Dome
+            ctx.fillStyle = flash ? '#ffffff' : '#440066';
+            ctx.beginPath();
+            ctx.ellipse(this.x + this.width/2, this.y + this.height/2, this.width/3, this.height/3.5, 0, Math.PI, 0);
+            ctx.fill();
+            // Glow ring
+            ctx.shadowColor = '#cc00ff';
+            ctx.shadowBlur  = 12;
+            ctx.strokeStyle = '#ff88ff';
+            ctx.lineWidth   = 2;
+            ctx.beginPath();
+            ctx.ellipse(this.x + this.width/2, this.y + this.height/2 + 5, this.width/2, 6, 0, 0, Math.PI*2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            // Eyes inside dome
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(this.x + 10, this.y + 12, 5, 5);
+            ctx.fillRect(this.x + 22, this.y + 12, 5, 5);
+            // HP hearts
+            for (let i = 0; i < this.hp; i++) {
+                ctx.font = '10px serif';
+                ctx.fillText('❤', this.x + 10 + i * 14, this.y - 4);
+            }
+        } else if (currentLevel === 3) {
+            // Regular space mob — floating ghost alien
+            ctx.fillStyle = flash ? '#ffffff' : '#00ccff';
+            ctx.beginPath();
+            ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2, Math.PI, 0);
+            ctx.lineTo(this.x + this.width, this.y + this.height);
+            ctx.lineTo(this.x + this.width * 0.75, this.y + this.height - 8);
+            ctx.lineTo(this.x + this.width * 0.5, this.y + this.height);
+            ctx.lineTo(this.x + this.width * 0.25, this.y + this.height - 8);
+            ctx.lineTo(this.x, this.y + this.height);
+            ctx.fill();
+            ctx.fillStyle = flash ? '#aaa' : '#002244';
+            ctx.fillRect(this.x + 5,  this.y + 10, 7, 7);
+            ctx.fillRect(this.x + 18, this.y + 10, 7, 7);
+            ctx.shadowColor = '#00ccff';
+            ctx.shadowBlur  = 10;
+            ctx.strokeStyle = '#00ccff';
+            ctx.lineWidth   = 1;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        } else {
+            // Normal red blob
+            ctx.fillStyle = flash ? '#ffffff' : (this.tanky ? '#9b0000' : '#e84118');
+            ctx.beginPath();
+            ctx.arc(this.x + this.width/2, this.y + this.height/2 + 5, this.width/2, Math.PI, 0);
+            ctx.lineTo(this.x + this.width, this.y + this.height);
+            ctx.lineTo(this.x, this.y + this.height);
+            ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.fillRect(this.x + 5,  this.y + 10, 8, 8);
+            ctx.fillRect(this.x + 18, this.y + 10, 8, 8);
+            ctx.fillStyle = 'black';
+            const pd = this.vx > 0 ? 2 : -2;
+            ctx.fillRect(this.x + 7  + pd, this.y + 12, 4, 4);
+            ctx.fillRect(this.x + 20 + pd, this.y + 12, 4, 4);
+            if (this.tanky) {
+                // Armour spikes
+                ctx.fillStyle = '#555';
+                for (let i = 0; i < 3; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + 5 + i*12, this.y + 5);
+                    ctx.lineTo(this.x + 11 + i*12, this.y + 5);
+                    ctx.lineTo(this.x + 8 + i*12, this.y - 5);
+                    ctx.fill();
+                }
+                // HP indicator
+                for (let i = 0; i < this.hp; i++) {
+                    ctx.font = '10px serif';
+                    ctx.fillText('❤', this.x + 5 + i * 14, this.y - 7);
+                }
+            }
+        }
         ctx.restore();
     }
 }
 
+/* ─── COIN ─────────────────────────────────────── */
 class Coin {
     constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.width = 20;
-        this.height = 20;
+        this.x = x; this.y = y;
+        this.width = 20; this.height = 20;
         this.collected = false;
         this.floatOffset = Math.random() * Math.PI * 2;
     }
-
-    update() {
-        this.floatOffset += 0.1;
-    }
-
+    update() { this.floatOffset += 0.1; }
     draw() {
         if (this.collected) return;
         const bobY = Math.sin(this.floatOffset) * 5;
-
         ctx.save();
         ctx.translate(-cameraX, 0);
-
-        ctx.fillStyle = '#fbc531';
+        if (currentLevel === 3) {
+            // Glowing space crystal
+            ctx.shadowColor = '#88ffff';
+            ctx.shadowBlur  = 10;
+            ctx.fillStyle   = '#44ffee';
+        } else {
+            ctx.fillStyle = '#fbc531';
+        }
         ctx.beginPath();
-        ctx.arc(this.x + 10, this.y + 10 + bobY, 10, 0, Math.PI * 2);
+        ctx.arc(this.x + 10, this.y + 10 + bobY, 10, 0, Math.PI*2);
         ctx.fill();
-        
-        ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.beginPath();
-        ctx.arc(this.x + 7, this.y + 7 + bobY, 3, 0, Math.PI * 2);
+        ctx.arc(this.x + 7, this.y + 7 + bobY, 3, 0, Math.PI*2);
         ctx.fill();
-
         ctx.restore();
     }
 }
 
+/* ─── FLAG ─────────────────────────────────────── */
 class Flag {
-    constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.width = 10;
-        this.height = 100;
-    }
-
+    constructor(x, y) { this.x = x; this.y = y; this.width = 10; this.height = 100; }
     draw() {
         ctx.save();
         ctx.translate(-cameraX, 0);
-
+        if (currentLevel === 3) {
+            ctx.shadowColor = '#aaffff';
+            ctx.shadowBlur  = 14;
+        }
         ctx.fillStyle = '#bdc3c7';
         ctx.fillRect(this.x, this.y - 100, this.width, 100);
-
-        ctx.fillStyle = '#e1b12c';
+        ctx.fillStyle = currentLevel === 3 ? '#00ffdd' : '#e1b12c';
         ctx.beginPath();
         ctx.moveTo(this.x + 10, this.y - 100);
         ctx.lineTo(this.x + 60, this.y - 80);
         ctx.lineTo(this.x + 10, this.y - 60);
         ctx.fill();
-
+        ctx.shadowBlur = 0;
         ctx.restore();
     }
 }
 
+/* ─── PARTICLE ─────────────────────────────────── */
 class Particle {
     constructor(x, y, color) {
-        this.x = x;
-        this.y = y;
-        this.size = Math.random() * 5 + 2;
+        this.x = x; this.y = y;
+        this.size   = Math.random() * 5 + 2;
         this.speedX = Math.random() * 4 - 2;
         this.speedY = Math.random() * 4 - 2;
-        this.color = color;
-        this.life = 1.0;
+        this.color  = color;
+        this.life   = 1.0;
     }
-    update() {
-        this.x += this.speedX;
-        this.y += this.speedY;
-        this.life -= 0.05;
-    }
+    update() { this.x += this.speedX; this.y += this.speedY; this.life -= 0.05; }
     draw() {
         ctx.save();
         ctx.globalAlpha = this.life;
@@ -599,203 +604,245 @@ class Particle {
     }
 }
 
-/**
- * GAME DATA
- */
-
+/* ─── GAME OBJECTS ─────────────────────────────── */
 const player = new Player();
-let platforms = [];
-let enemies = [];
-let coins = [];
-let particles = [];
-let flag;
+let platforms = [], enemies = [], coins = [], particles = [], flag;
 
-function createCoinPath(startX, startY, count) {
-    for(let i=0; i<count; i++) {
-        coins.push(new Coin(startX + (i * 40), startY));
-    }
+function createCoinPath(sx, sy, count, gap) {
+    gap = gap || 40;
+    for (let i = 0; i < count; i++) coins.push(new Coin(sx + i * gap, sy));
+}
+function makePlatform(x, y, w, h, type) {
+    return new Platform(x, y, w, h, type);
+}
+function makeMoving(x, y, w, h, range, speed) {
+    const p = new Platform(x, y, w, h, 'moving');
+    p.moveRange = range; p.moveSpeed = speed;
+    return p;
 }
 
-// --- LEVEL 1 DESIGN ---
+/* ─── LEVEL 1 ───────────────────────────────────── */
 function initLevel1() {
-    wrapper.style.background = "linear-gradient(to bottom, #87CEEB, #E0F7FA)"; // Day
-
-    platforms = [];
-    enemies = [];
-    coins = [];
-    particles = [];
-
-    // Ground segments
+    wrapper.style.background = "linear-gradient(to bottom, #87CEEB, #E0F7FA)";
+    platforms = []; enemies = []; coins = []; particles = [];
     platforms.push(new Platform(0, 400, 1000, 50));
     platforms.push(new Platform(1200, 400, 600, 50));
-    platforms.push(new Platform(1900, 350, 200, 50)); 
+    platforms.push(new Platform(1900, 350, 200, 50));
     platforms.push(new Platform(2200, 400, 800, 50));
-    
-    // Floating
     platforms.push(new Platform(2400, 280, 150, 20));
     platforms.push(new Platform(2700, 200, 150, 20));
     platforms.push(new Platform(3000, 400, 1000, 50));
-
-    // Steps
     platforms.push(new Platform(4100, 350, 100, 50));
     platforms.push(new Platform(4200, 300, 100, 50));
     platforms.push(new Platform(4300, 250, 100, 50));
-    
-    // Final run
     platforms.push(new Platform(4500, 400, 800, 50));
-
-    // Goal
     flag = new Flag(5200, 400);
-
-    // Enemies
-    enemies.push(new Enemy(1300, 370, 300));
-    enemies.push(new Enemy(3000, 370, 600));
-    enemies.push(new Enemy(4600, 370, 200));
-
-    // Coins
+    enemies.push(new Enemy(1300, 370, 300, false));
+    enemies.push(new Enemy(3000, 370, 600, false));
+    enemies.push(new Enemy(4600, 370, 200, false));
     createCoinPath(300, 350, 5);
     createCoinPath(1950, 300, 5);
     createCoinPath(2750, 150, 5);
     createCoinPath(2400, 230, 3);
 }
 
-// --- LEVEL 2 DESIGN ---
+/* ─── LEVEL 2 ───────────────────────────────────── */
 function initLevel2() {
-    // Sunset Theme
     wrapper.style.background = "linear-gradient(to bottom, #ff7e5f, #feb47b)";
-
-    platforms = [];
-    enemies = [];
-    coins = [];
-    particles = [];
-
-    // Start Platform (floating)
+    platforms = []; enemies = []; coins = []; particles = [];
     platforms.push(new Platform(0, 300, 300, 20));
-
-    // Series of small floating islands (Precision jumping)
     platforms.push(new Platform(400, 350, 80, 20));
     platforms.push(new Platform(550, 250, 80, 20));
     platforms.push(new Platform(700, 350, 80, 20));
     platforms.push(new Platform(850, 250, 80, 20));
-    
-    // Larger landing area with enemy
     platforms.push(new Platform(1000, 400, 400, 50));
-    enemies.push(new Enemy(1100, 370, 200));
-    enemies.push(new Enemy(1250, 370, 100)); // Second enemy blocking path
-
-    // Vertical climb
+    enemies.push(new Enemy(1100, 370, 200, false));
+    enemies.push(new Enemy(1250, 370, 100, false));
     platforms.push(new Platform(1450, 320, 100, 20));
     platforms.push(new Platform(1300, 240, 100, 20));
     platforms.push(new Platform(1450, 160, 100, 20));
-
-    // The "Gap of Doom" - Long jump with moving coin
     platforms.push(new Platform(1700, 400, 200, 50));
-    coins.push(new Coin(1650, 200)); // Risky coin mid-air
-
-    // Enemy gauntlet
+    coins.push(new Coin(1650, 200));
     platforms.push(new Platform(2000, 400, 800, 50));
-    enemies.push(new Enemy(2100, 370, 400));
-    enemies.push(new Enemy(2500, 370, 400));
-
-    // Stairs to Flag
+    enemies.push(new Enemy(2100, 370, 400, false));
+    enemies.push(new Enemy(2500, 370, 400, false));
     platforms.push(new Platform(2900, 350, 80, 50));
     platforms.push(new Platform(3000, 300, 80, 50));
     platforms.push(new Platform(3100, 250, 80, 50));
     platforms.push(new Platform(3200, 200, 80, 50));
-
-    // Final Platform
     platforms.push(new Platform(3300, 400, 500, 50));
-    
-    // Flag
     flag = new Flag(3700, 400);
-
-    // Coins in dangerous places
     createCoinPath(410, 300, 2);
     createCoinPath(560, 200, 2);
-    createCoinPath(1460, 120, 3); // Top of vertical climb
-    createCoinPath(2400, 350, 5); // Over enemies
+    createCoinPath(1460, 120, 3);
+    createCoinPath(2400, 350, 5);
+}
+
+/* ─── LEVEL 3 — SPACE ───────────────────────────── */
+function initLevel3() {
+    wrapper.style.background = "linear-gradient(to bottom, #000010, #0a0030)";
+    generateStars();
+    platforms = []; enemies = []; coins = []; particles = [];
+
+    // ── Start safe pad
+    platforms.push(makePlatform(0, 350, 200, 20));
+
+    // ── Moving platform intro
+    const m1 = makeMoving(300, 330, 90, 20, 100, 1.2);
+    platforms.push(m1);
+    const m2 = makeMoving(500, 280, 90, 20, 120, 1.5);
+    platforms.push(m2);
+
+    // ── Crumble zone
+    platforms.push(makePlatform(700, 350, 80, 15, 'crumble'));
+    platforms.push(makePlatform(850, 300, 80, 15, 'crumble'));
+    platforms.push(makePlatform(1000, 350, 80, 15, 'crumble'));
+
+    // ── First enemy arena
+    platforms.push(makePlatform(1150, 400, 350, 50));
+    enemies.push(new Enemy(1200, 365, 150, false)); // normal alien
+    enemies.push(new Enemy(1350, 365, 100, true));  // TANKY UFO
+
+    // ── Vertical leap section
+    platforms.push(makePlatform(1550, 370, 80, 20));
+    platforms.push(makePlatform(1550, 290, 80, 20));
+    platforms.push(makePlatform(1700, 210, 80, 20));
+    platforms.push(makePlatform(1700, 130, 80, 20));
+
+    // ── Moving platforms over void
+    const m3 = makeMoving(1850, 200, 80, 20, 140, 1.8);
+    platforms.push(m3);
+    const m4 = makeMoving(2100, 160, 80, 20, 80, 2.2);
+    platforms.push(m4);
+
+    // ── Second enemy gauntlet (tanky guards the coins)
+    platforms.push(makePlatform(2300, 380, 500, 50));
+    enemies.push(new Enemy(2350, 345, 200, true));  // TANKY
+    enemies.push(new Enemy(2580, 345, 120, false));  // normal
+    enemies.push(new Enemy(2680, 345, 80, true));   // TANKY
+
+    // ── Crumble staircase to sky
+    platforms.push(makePlatform(2850, 340, 70, 15, 'crumble'));
+    platforms.push(makePlatform(2950, 290, 70, 15, 'crumble'));
+    platforms.push(makePlatform(3050, 240, 70, 15, 'crumble'));
+    platforms.push(makePlatform(3150, 190, 70, 15, 'crumble'));
+
+    // ── Moving platforms high up
+    const m5 = makeMoving(3280, 170, 100, 20, 120, 1.5);
+    platforms.push(m5);
+    const m6 = makeMoving(3500, 140, 100, 20, 100, 2.0);
+    platforms.push(m6);
+
+    // ── Final boss platform — last tanky enemy blocking the flag
+    platforms.push(makePlatform(3700, 350, 400, 50));
+    enemies.push(new Enemy(3740, 315, 200, true)); // guard
+
+    // ── Flag
+    flag = new Flag(4050, 350);
+
+    // ── Coins
+    createCoinPath(310, 280, 3, 45);          // moving platform coins
+    coins.push(new Coin(1560, 240));           // vertical climb
+    coins.push(new Coin(1710, 165));
+    createCoinPath(2360, 330, 5, 50);          // over tanky enemies (risky!)
+    coins.push(new Coin(3290, 120));           // high moving platform
+    coins.push(new Coin(3510, 90));
+    createCoinPath(3720, 300, 4, 45);          // near final boss
 }
 
 function initLevel() {
-    if (currentLevel === 1) {
-        initLevel1();
-    } else {
-        initLevel2();
-    }
+    if      (currentLevel === 1) initLevel1();
+    else if (currentLevel === 2) initLevel2();
+    else                         initLevel3();
 }
 
-/**
- * CORE LOGIC
- */
-
+/* ─── HELPERS ──────────────────────────────────── */
 function createParticles(x, y, color, count) {
-    for(let i=0; i<count; i++) {
-        particles.push(new Particle(x, y, color));
-    }
+    for (let i = 0; i < count; i++) particles.push(new Particle(x, y, color));
 }
 
+function rectIntersect(x1,y1,w1,h1, x2,y2,w2,h2) {
+    return x2 < x1+w1 && x2+w2 > x1 && y2 < y1+h1 && y2+h2 > y1;
+}
+
+/* ─── COLLISION ────────────────────────────────── */
 function checkCollisions() {
     player.grounded = false;
-    
+
     for (let p of platforms) {
+        if (!p.alive) continue;
         if (player.x < p.x + p.width &&
             player.x + player.width > p.x &&
             player.y + player.height > p.y &&
             player.y + player.height < p.y + p.height + 20 &&
             player.vy >= 0) {
-                
-                player.grounded = true;
-                player.vy = 0;
-                player.y = p.y - player.height;
+            player.grounded = true;
+            player.vy = 0;
+            player.y  = p.y - player.height;
+            // Ride moving platform
+            if (p.type === 'moving') player.x += p.moveSpeed * p.moveDir;
+            // Crumble on step
+            if (p.type === 'crumble' && p.crumbleTimer === 0) p.crumbleTimer = 80;
         }
     }
 
     for (let e of enemies) {
-        if (rectIntersect(player.x, player.y, player.width, player.height, e.x, e.y, e.width, e.height)) {
+        if (e.hp <= 0) continue;
+        if (rectIntersect(player.x, player.y, player.width, player.height,
+                          e.x, e.y, e.width, e.height)) {
+            // Stomp
             if (player.vy > 0 && player.y + player.height < e.y + e.height / 2 + 10) {
-                // Kill Enemy
-                e.x = -9999;
+                e.hp--;
+                e.hitFlash = 20;
                 player.vy = -10;
-                score += 50;
-                scoreDisplay.innerText = "Coins: " + score;
-                createParticles(player.x, player.y + player.height, '#e84118', 10);
-            } else {
-                // Hit Player
-                if (player.invulnerable === 0) {
-                    die();
+                createParticles(e.x + e.width/2, e.y + e.height/2,
+                    e.tanky ? '#cc00ff' : '#e84118', 12);
+                if (e.hp <= 0) {
+                    score += e.tanky ? 150 : 50;
+                    scoreDisplay.innerText = "Coins: " + score;
+                    createParticles(e.x + e.width/2, e.y, '#ffd700', 20);
+                } else {
+                    // Hit but alive — bounce higher for tanky
+                    player.vy = -12;
                 }
+            } else {
+                if (player.invulnerable === 0) die();
             }
         }
     }
 
     for (let c of coins) {
-        if (!c.collected && 
-            rectIntersect(player.x, player.y, player.width, player.height, c.x, c.y, c.width, c.height)) {
+        if (!c.collected &&
+            rectIntersect(player.x, player.y, player.width, player.height,
+                          c.x, c.y, c.width, c.height)) {
             c.collected = true;
             score += 10;
             scoreDisplay.innerText = "Coins: " + score;
-            createParticles(c.x, c.y, '#fbc531', 5);
+            createParticles(c.x, c.y, currentLevel === 3 ? '#44ffee' : '#fbc531', 5);
         }
     }
 
-    // Victory Logic
-    if (rectIntersect(player.x, player.y, player.width, player.height, flag.x, flag.y - 100, flag.width + 60, flag.height)) {
+    // Victory
+    if (rectIntersect(player.x, player.y, player.width, player.height,
+                      flag.x, flag.y - 100, flag.width + 60, flag.height)) {
         victory();
     }
 }
 
-function rectIntersect(x1, y1, w1, h1, x2, y2, w2, h2) {
-    return x2 < x1 + w1 && x2 + w2 > x1 && y2 < y1 + h1 && y2 + h2 > y1;
-}
-
+/* ─── DEATH / GAME OVER / VICTORY ─────────────── */
 function die() {
-    lives--;
-    livesDisplay.innerText = "Lives: " + lives;
-    
-    if (lives > 0) {
+    hearts--;
+    updateHeartsDisplay();
+    if (hearts > 0) {
         player.reset();
-        player.invulnerable = 60; // 1 second invulnerability
-        cameraX = 0; // Reset camera
+        player.invulnerable = 80;
+        cameraX = 0;
+        // Restore crumbled platforms in level 3 on respawn
+        if (currentLevel === 3) {
+            for (let p of platforms) {
+                if (p.type === 'crumble') { p.alive = true; p.crumbleTimer = 0; }
+            }
+        }
     } else {
         gameOver();
     }
@@ -808,102 +855,106 @@ function gameOver() {
 }
 
 function victory() {
-    if (currentLevel === 1) {
-        // Transition to Level 2
-        gameRunning = false;
-        showTransition();
+    gameRunning = false;
+    if (currentLevel < 3) {
+        showTransition(currentLevel + 1);
     } else {
-        // Game Fully Beaten
-        gameRunning = false;
         victoryScoreText.innerText = "Total Coins: " + score;
         victoryScreen.classList.remove('hidden');
     }
 }
 
-function showTransition() {
+function showTransition(nextLevel) {
+    const names    = { 2: 'SUNSET HORIZON', 3: '⭐ SPACE FRONTIER ⭐' };
+    const bonuses  = { 2: '+1 Extra Heart!', 3: '+1 Extra Heart!' };
+    levelTitle.innerText    = names[nextLevel];
+    levelSubtitle.innerText = 'Level ' + nextLevel;
+    levelBonus.innerText    = bonuses[nextLevel];
+
     levelTransition.classList.add('active');
     setTimeout(() => {
-        currentLevel = 2;
-        levelDisplay.innerText = "Level: 2";
-        startLevel2();
-        levelTransition.classList.remove('active');
-    }, 2500);
-}
+        currentLevel = nextLevel;
+        levelDisplay.innerText = "Level: " + currentLevel;
 
-function startLevel2() {
-    player.reset();
-    initLevel();
-    cameraX = 0;
-    gameRunning = true;
+        // Grant bonus heart on level advance
+        maxHearts++;
+        hearts = maxHearts;
+        updateHeartsDisplay();
+
+        player.reset();
+        initLevel();
+        cameraX = 0;
+        gameRunning = true;
+        levelTransition.classList.remove('active');
+    }, 2800);
 }
 
 function resetGame() {
     currentLevel = 1;
     levelDisplay.innerText = "Level: 1";
-    score = 0;
-    lives = 3;
+    score     = 0; maxHearts = 3; hearts = 3;
     scoreDisplay.innerText = "Coins: 0";
-    livesDisplay.innerText = "Lives: 3";
+    updateHeartsDisplay();
     player.reset();
     initLevel();
     cameraX = 0;
     gameRunning = true;
-    
-    // UI Handling
     startScreen.classList.add('hidden');
     gameOverScreen.classList.add('hidden');
     victoryScreen.classList.add('hidden');
-
-    if (!animationId) {
-        gameLoop();
-    }
+    if (!animationId) gameLoop();
 }
 
-/**
- * MAIN LOOP
- */
-
+/* ─── MAIN LOOP ────────────────────────────────── */
 function update() {
     if (!gameRunning) return;
-
     player.update();
+    platforms.forEach(p => p.update());
     enemies.forEach(e => e.update());
     coins.forEach(c => c.update());
-    
-    particles.forEach((p, index) => {
-        p.update();
-        if (p.life <= 0) particles.splice(index, 1);
-    });
-
+    particles.forEach((p, i) => { p.update(); if (p.life <= 0) particles.splice(i, 1); });
     checkCollisions();
-
     let targetCamX = player.x - canvas.width / 3;
     if (targetCamX < 0) targetCamX = 0;
-    
-    // Dynamic clamp for level length
-    let maxCam = currentLevel === 1 ? 5000 : 3500;
+    const maxCam = currentLevel === 1 ? 5000 : currentLevel === 2 ? 3500 : 3800;
     if (targetCamX > maxCam) targetCamX = maxCam;
-
     cameraX = targetCamX;
+}
+
+function drawBackground() {
+    if (currentLevel === 3) {
+        // Deep space gradient redrawn each frame for parallax
+        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, '#000010');
+        grad.addColorStop(1, '#0a0030');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        drawNebula();
+        drawStars();
+    } else if (currentLevel === 2) {
+        // Already set via wrapper CSS — draw parallax clouds in orange tint
+        ctx.fillStyle = 'rgba(255,200,150,0.3)';
+        ctx.beginPath();
+        ctx.arc(100 - (cameraX * 0.2) % 900, 80, 40, 0, Math.PI*2);
+        ctx.arc(170 - (cameraX * 0.2) % 900, 100, 50, 0, Math.PI*2);
+        ctx.fill();
+    } else {
+        // Day sky parallax clouds
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.beginPath();
+        ctx.arc(100 - (cameraX * 0.2) % 900, 100, 40, 0, Math.PI*2);
+        ctx.arc(160 - (cameraX * 0.2) % 900, 120, 50, 0, Math.PI*2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(500 - (cameraX * 0.5) % 900, 80, 60, 0, Math.PI*2);
+        ctx.arc(600 - (cameraX * 0.5) % 900, 90, 50, 0, Math.PI*2);
+        ctx.fill();
+    }
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    ctx.save();
-    // Parallax Clouds (Change color slightly based on level? Keeping simple for now)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.beginPath();
-    ctx.arc(100 - (cameraX * 0.2) % 900, 100, 40, 0, Math.PI*2);
-    ctx.arc(160 - (cameraX * 0.2) % 900, 120, 50, 0, Math.PI*2);
-    ctx.fill();
-    
-    ctx.beginPath();
-    ctx.arc(500 - (cameraX * 0.5) % 900, 80, 60, 0, Math.PI*2);
-    ctx.arc(600 - (cameraX * 0.5) % 900, 90, 50, 0, Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-
+    drawBackground();
     flag.draw();
     platforms.forEach(p => p.draw());
     coins.forEach(c => c.draw());
@@ -918,44 +969,35 @@ function gameLoop() {
     animationId = requestAnimationFrame(gameLoop);
 }
 
-/**
- * EVENT LISTENERS
- */
-
+/* ─── INPUT ────────────────────────────────────── */
 window.addEventListener('keydown', e => {
     if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
-    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+    if (e.code === 'ArrowLeft'  || e.code === 'KeyA') keys.left  = true;
     if (e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') keys.up = true;
     if (e.code === 'KeyR' && !gameRunning && startScreen.classList.contains('hidden')) resetGame();
 });
-
 window.addEventListener('keyup', e => {
     if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
-    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+    if (e.code === 'ArrowLeft'  || e.code === 'KeyA') keys.left  = false;
     if (e.code === 'ArrowUp' || e.code === 'Space' || e.code === 'KeyW') keys.up = false;
 });
 
-const btnLeft = document.getElementById('btn-left');
-const btnRight = document.getElementById('btn-right');
-const btnJump = document.getElementById('btn-jump');
-
-const addTouch = (elem, code) => {
-    elem.addEventListener('touchstart', (e) => { e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keydown', {'code': code})); });
-    elem.addEventListener('touchend', (e) => { e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keyup', {'code': code})); });
+const addTouch = (id, code) => {
+    const el = document.getElementById(id);
+    el.addEventListener('touchstart', e => { e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keydown', {code})); });
+    el.addEventListener('touchend',   e => { e.preventDefault(); window.dispatchEvent(new KeyboardEvent('keyup',   {code})); });
 };
-
-addTouch(btnLeft, 'ArrowLeft');
-addTouch(btnRight, 'ArrowRight');
-addTouch(btnJump, 'Space');
+addTouch('btn-left',  'ArrowLeft');
+addTouch('btn-right', 'ArrowRight');
+addTouch('btn-jump',  'Space');
 
 document.getElementById('start-btn').addEventListener('click', resetGame);
 document.getElementById('restart-btn').addEventListener('click', resetGame);
 document.getElementById('play-again-btn').addEventListener('click', resetGame);
 
-// Init
+/* ─── INIT ─────────────────────────────────────── */
 initLevel();
 draw();
-
 </script>
 </body>
 </html>
