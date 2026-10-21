@@ -145,13 +145,13 @@
     <!-- Start Screen -->
     <div id="start-screen" class="ui-layer">
         <h1>SKYBOUND ADVENTURER</h1>
-        <p>A 3-level sky adventure! Reach the flag each level.</p>
+        <p>A 4-level adventure! Reach the flag each level.</p>
         <div class="controls-hint">
             <span><span class="key">←</span> <span class="key">→</span></span> <span>Move</span>
             <span><span class="key">Space</span> / <span class="key">↑</span></span> <span>Jump</span>
             <span><span class="key">R</span></span> <span>Restart (after game over)</span>
         </div>
-        <p style="font-size:0.85rem;color:#aaa;margin-bottom:18px;font-style:italic;">Tip: Stomp enemies to defeat them. Tanky enemies need 2 stomps!</p>
+        <p style="font-size:0.85rem;color:#aaa;margin-bottom:18px;font-style:italic;">Tip: Stomp enemies to defeat them. Tanky enemies need multiple stomps! In the Volcanic Depths, run into cracked walls to smash them open — and don't stop moving, the lava never does.</p>
         <button id="start-btn">PLAY NOW</button>
     </div>
 
@@ -165,7 +165,7 @@
     <!-- Victory Screen -->
     <div id="victory-screen" class="ui-layer hidden">
         <h1 style="color:#ffd700;-webkit-text-fill-color:#ffd700;">🏆 YOU WIN!</h1>
-        <p>You conquered all 3 levels!</p>
+        <p>You conquered all 4 levels!</p>
         <p id="victory-score">Total Coins: 0</p>
         <p style="font-size:0.85rem;color:#ccc;margin-top:12px;font-weight:bold;">made by keshav jha ♥</p>
         <button id="play-again-btn" style="margin-top:18px;">PLAY AGAIN</button>
@@ -215,6 +215,16 @@ let hearts       = 3;
 let animationId;
 let cameraX      = 0;
 let stars        = [];
+
+/* ─── LEVEL 4 GLOBALS ────────────────────────── */
+let stalactites = [], stalagmites = [], embers = [];
+let geysers = [], breakWalls = [], heatZones = [], fireTrails = [], rocks = [];
+let playerInHeat = false;
+let lavaY = 650, lavaStartY = 650;
+let frameCount = 0, cameraShake = 0;
+const LAVA_SPEED = 0.2;
+const GEYSER_PERIOD = 260;
+const GEYSER_ERUPT_START = 210;
 
 const keys = { right: false, left: false, up: false };
 
@@ -285,6 +295,7 @@ class Player {
         this.isDead = false;
         this.facingRight = true;
         this.invulnerable = 0;
+        this.heatMeter = 0;
     }
     update() {
         if (this.isDead) return;
@@ -341,7 +352,7 @@ class Platform {
     constructor(x, y, w, h, type) {
         this.x = x; this.y = y;
         this.width = w; this.height = h;
-        this.type = type || 'normal'; // 'normal' | 'crumble' | 'moving'
+        this.type = type || 'normal'; // 'normal' | 'crumble' | 'moving' | 'conveyor'
         this.crumbleTimer = 0;
         this.alive = true;
         // moving platform
@@ -381,7 +392,7 @@ class Platform {
             ctx.fillRect(this.x, this.y, this.width, 10);
             ctx.fillStyle = '#6c2a2a';
             ctx.fillRect(this.x, this.y + 10, this.width, this.height - 10);
-        } else {
+        } else if (currentLevel === 3) {
             // Space: glowing neon asteroid platforms
             if (this.type === 'crumble') {
                 ctx.fillStyle = '#ff4444';
@@ -406,6 +417,40 @@ class Platform {
             ctx.lineWidth   = 1;
             ctx.strokeRect(this.x, this.y, this.width, 8);
             ctx.shadowBlur = 0;
+        } else {
+            // LEVEL 4 — VOLCANIC DEPTHS: basalt with lava glow
+            if (this.type === 'conveyor') {
+                ctx.fillStyle = '#ff7043';
+                ctx.fillRect(this.x, this.y, this.width, 10);
+                ctx.fillStyle = '#2e0d05';
+                ctx.fillRect(this.x, this.y + 10, this.width, this.height - 10);
+                // animated direction chevrons
+                ctx.shadowColor = '#ff5722';
+                ctx.shadowBlur = 8;
+                ctx.fillStyle = '#ffca28';
+                const dir = this.conveyorDir || 1;
+                const off = ((frameCount * 1.6 * dir) % 24 + 24) % 24;
+                for (let px = this.x - 24 + off; px < this.x + this.width; px += 24) {
+                    if (px < this.x + 4 || px > this.x + this.width - 12) continue;
+                    ctx.beginPath();
+                    ctx.moveTo(px, this.y + 2);
+                    ctx.lineTo(px + 8 * dir, this.y + 5);
+                    ctx.lineTo(px, this.y + 8);
+                    ctx.fill();
+                }
+                ctx.shadowBlur = 0;
+            } else {
+                ctx.fillStyle = '#ff6d3f';
+                ctx.fillRect(this.x, this.y, this.width, 10);
+                ctx.fillStyle = '#2b120a';
+                ctx.fillRect(this.x, this.y + 10, this.width, this.height - 10);
+                ctx.shadowColor = '#ff3d00';
+                ctx.shadowBlur = 10;
+                ctx.strokeStyle = '#ff6d3f';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(this.x, this.y, this.width, 10);
+                ctx.shadowBlur = 0;
+            }
         }
         ctx.strokeStyle = 'rgba(0,0,0,0.25)';
         ctx.lineWidth = 1.5;
@@ -526,6 +571,247 @@ class Enemy {
     }
 }
 
+/* ─── LEVEL 4 ENEMY: FIRE SLIME ────────────────── */
+class FireSlime {
+    constructor(x, y, range) {
+        this.startX = x; this.x = x; this.y = y;
+        this.width = 34; this.height = 24;
+        this.range = range;
+        this.tanky = false; this.hp = 1;
+        this.speed = 2; this.vx = this.speed;
+        this.hitFlash = 0; this.t = 0; this.dropTimer = 0;
+        this.bounty = 75;
+    }
+    update() {
+        this.t++;
+        this.x += this.vx;
+        if (this.x > this.startX + this.range || this.x < this.startX) this.vx *= -1;
+        if (this.hitFlash > 0) this.hitFlash--;
+        // leave burning trail
+        this.dropTimer++;
+        if (this.dropTimer >= 11) {
+            this.dropTimer = 0;
+            fireTrails.push({
+                x: this.x + this.width / 2 - 8,
+                y: this.y + this.height - 8,
+                w: 16, h: 8, life: 110
+            });
+        }
+    }
+    draw() {
+        if (this.hp <= 0) return;
+        ctx.save();
+        ctx.translate(-cameraX, 0);
+        const flash = this.hitFlash > 0;
+        const fl = Math.sin(this.t * 0.35) * 3;
+        ctx.shadowColor = '#ff6f00';
+        ctx.shadowBlur = 12;
+        // flame crown
+        ctx.fillStyle = flash ? '#ffffff' : '#ffca28';
+        ctx.beginPath();
+        ctx.moveTo(this.x + 8, this.y + 6);
+        ctx.quadraticCurveTo(this.x + 12, this.y - 10 - fl, this.x + 17, this.y + 2 - fl);
+        ctx.quadraticCurveTo(this.x + 22, this.y - 12 + fl, this.x + 26, this.y + 6);
+        ctx.fill();
+        // body
+        ctx.fillStyle = flash ? '#ffffff' : '#ff7043';
+        ctx.beginPath();
+        ctx.arc(this.x + this.width / 2, this.y + this.height, this.width / 2, Math.PI, 0);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = flash ? '#ffffff' : '#d84315';
+        ctx.beginPath();
+        ctx.arc(this.x + this.width / 2, this.y + this.height, this.width / 2.8, Math.PI, 0);
+        ctx.fill();
+        // eyes
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(this.x + 8, this.y + 10, 7, 6);
+        ctx.fillRect(this.x + 20, this.y + 10, 7, 6);
+        ctx.fillStyle = '#b71c1c';
+        const pd = this.vx > 0 ? 2 : 0;
+        ctx.fillRect(this.x + 10 + pd, this.y + 12, 3, 3);
+        ctx.fillRect(this.x + 22 + pd, this.y + 12, 3, 3);
+        ctx.restore();
+    }
+}
+
+/* ─── LEVEL 4 ENEMY: ROCK GOLEM (3-stomp tank) ─── */
+class RockGolem {
+    constructor(x, y, range) {
+        this.startX = x; this.x = x; this.y = y;
+        this.width = 46; this.height = 52;
+        this.range = range;
+        this.tanky = true; this.hp = 3;
+        this.speed = 1.1; this.vx = this.speed;
+        this.hitFlash = 0; this.t = 0;
+        this.throwTimer = 100; this.throwAnim = 0;
+        this.bounty = 300;
+    }
+    update() {
+        this.t++;
+        this.x += this.vx;
+        if (this.x > this.startX + this.range || this.x < this.startX) this.vx *= -1;
+        if (this.hitFlash > 0) this.hitFlash--;
+        if (this.throwAnim > 0) this.throwAnim--;
+        // throw rock in an arc toward the player
+        this.throwTimer--;
+        if (this.throwTimer <= 0 && Math.abs(player.x - this.x) < 620) {
+            this.throwTimer = 170;
+            this.throwAnim = 22;
+            const dir = player.x > this.x ? 1 : -1;
+            const dist = Math.min(Math.abs(player.x - this.x) / 160, 1.4);
+            rocks.push({
+                x: this.x + this.width / 2 + dir * 10,
+                y: this.y + 6,
+                vx: dir * (3.2 + dist * 1.7),
+                vy: -7.6,
+                r: 8,
+                life: 230
+            });
+            createParticles(this.x + this.width / 2, this.y + 8, '#8d6e63', 6);
+        }
+    }
+    draw() {
+        if (this.hp <= 0) return;
+        ctx.save();
+        ctx.translate(-cameraX, 0);
+        const flash = this.hitFlash > 0;
+        const rock = flash ? '#ffffff' : '#5d4037';
+        const rockDark = flash ? '#eeeeee' : '#4e342e';
+        const dir = this.vx > 0 ? 1 : -1;
+        // legs
+        ctx.fillStyle = rockDark;
+        ctx.fillRect(this.x + 6, this.y + 40, 14, 12);
+        ctx.fillRect(this.x + 26, this.y + 40, 14, 12);
+        // body
+        ctx.fillStyle = rock;
+        ctx.fillRect(this.x + 3, this.y + 16, 40, 26);
+        // arms (right arm raises when throwing)
+        ctx.fillStyle = rockDark;
+        if (this.throwAnim > 0) ctx.fillRect(this.x + 38, this.y - 2, 10, 16);
+        else                    ctx.fillRect(this.x + 38, this.y + 20, 10, 20);
+        ctx.fillRect(this.x - 2, this.y + 20, 10, 20);
+        // head
+        ctx.fillStyle = rock;
+        ctx.fillRect(this.x + 11, this.y + 2, 24, 15);
+        // glowing lava cracks + eyes
+        ctx.save();
+        ctx.shadowColor = '#ff5722';
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = flash ? '#ffffff' : '#ff7043';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.x + 14, this.y + 18);
+        ctx.lineTo(this.x + 20, this.y + 28);
+        ctx.lineTo(this.x + 16, this.y + 38);
+        ctx.moveTo(this.x + 30, this.y + 20);
+        ctx.lineTo(this.x + 26, this.y + 32);
+        ctx.stroke();
+        ctx.fillStyle = '#ff5722';
+        const ex = dir > 0 ? 4 : 0;
+        ctx.fillRect(this.x + 15 + ex, this.y + 7, 5, 4);
+        ctx.fillRect(this.x + 26 + ex, this.y + 7, 5, 4);
+        ctx.restore();
+        // rock bumps
+        ctx.fillStyle = rockDark;
+        ctx.beginPath();
+        ctx.arc(this.x + 10, this.y + 20, 4, 0, Math.PI * 2);
+        ctx.arc(this.x + 36, this.y + 24, 4, 0, Math.PI * 2);
+        ctx.fill();
+        // hp hearts
+        for (let i = 0; i < this.hp; i++) {
+            ctx.font = '10px serif';
+            ctx.fillText('❤', this.x + 4 + i * 14, this.y - 6);
+        }
+        ctx.restore();
+    }
+}
+
+/* ─── LEVEL 4 ENEMY: BAT (sine-wave swarm) ─────── */
+class Bat {
+    constructor(x, baseY, range, amp, speed, phase) {
+        this.startX = x; this.x = x;
+        this.baseY = baseY; this.y = baseY;
+        this.range = range;
+        this.amp = amp || 45;
+        this.speed = speed || 1.4;
+        this.phase = phase || 0;
+        this.vx = this.speed;
+        this.width = 30; this.height = 20;
+        this.tanky = false; this.hp = 1;
+        this.hitFlash = 0; this.t = 0;
+        this.bounty = 75;
+    }
+    update() {
+        this.t++;
+        this.x += this.vx;
+        if (this.x > this.startX + this.range || this.x < this.startX) this.vx *= -1;
+        this.y = this.baseY + Math.sin(this.t * 0.06 + this.phase) * this.amp;
+        if (this.hitFlash > 0) this.hitFlash--;
+    }
+    draw() {
+        if (this.hp <= 0) return;
+        ctx.save();
+        ctx.translate(-cameraX, 0);
+        const flash = this.hitFlash > 0;
+        const flap = Math.sin(this.t * 0.45 + this.phase) * 7;
+        const cx = this.x + this.width / 2;
+        const cy = this.y + this.height / 2;
+        // wings
+        ctx.fillStyle = flash ? '#ffffff' : '#4a148c';
+        ctx.beginPath();
+        ctx.moveTo(cx - 4, cy);
+        ctx.quadraticCurveTo(this.x - 8, cy - 12 - flap, this.x - 4, cy + 2 - flap);
+        ctx.quadraticCurveTo(cx - 8, cy + 6, cx - 4, cy + 4);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(cx + 4, cy);
+        ctx.quadraticCurveTo(this.x + this.width + 8, cy - 12 - flap, this.x + this.width + 4, cy + 2 - flap);
+        ctx.quadraticCurveTo(cx + 8, cy + 6, cx + 4, cy + 4);
+        ctx.fill();
+        // body
+        ctx.fillStyle = flash ? '#ffffff' : '#6a1b9a';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, 8, 9, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // ears
+        ctx.beginPath();
+        ctx.moveTo(cx - 5, this.y + 2);
+        ctx.lineTo(cx - 2, this.y - 4);
+        ctx.lineTo(cx, this.y + 2);
+        ctx.moveTo(cx + 5, this.y + 2);
+        ctx.lineTo(cx + 2, this.y - 4);
+        ctx.lineTo(cx, this.y + 2);
+        ctx.fill();
+        // eyes
+        ctx.fillStyle = flash ? '#999999' : '#ff5252';
+        ctx.fillRect(cx - 4, cy - 3, 3, 3);
+        ctx.fillRect(cx + 1, cy - 3, 3, 3);
+        ctx.restore();
+    }
+}
+
+/* ─── LEVEL 4 HAZARDS ──────────────────────────── */
+class Geyser {
+    constructor(x, baseY, offset, eruptH) {
+        this.x = x; this.w = 30;
+        this.baseY = baseY;
+        this.offset = offset || 0;
+        this.eruptH = eruptH || 170;
+    }
+    phase() { return (frameCount + this.offset) % GEYSER_PERIOD; }
+    isWarning() { const p = this.phase(); return p >= 170 && p < GEYSER_ERUPT_START; }
+    isErupting() { return this.phase() >= GEYSER_ERUPT_START; }
+}
+
+class BreakableWall {
+    constructor(x, y, w, h) {
+        this.x = x; this.y = y;
+        this.w = w; this.h = h;
+        this.alive = true;
+    }
+}
+
 /* ─── COIN ─────────────────────────────────────── */
 class Coin {
     constructor(x, y) {
@@ -545,6 +831,11 @@ class Coin {
             ctx.shadowColor = '#88ffff';
             ctx.shadowBlur  = 10;
             ctx.fillStyle   = '#44ffee';
+        } else if (currentLevel === 4) {
+            // Ember coin
+            ctx.shadowColor = '#ff9100';
+            ctx.shadowBlur  = 10;
+            ctx.fillStyle   = '#ffca28';
         } else {
             ctx.fillStyle = '#fbc531';
         }
@@ -569,10 +860,13 @@ class Flag {
         if (currentLevel === 3) {
             ctx.shadowColor = '#aaffff';
             ctx.shadowBlur  = 14;
+        } else if (currentLevel === 4) {
+            ctx.shadowColor = '#ff7043';
+            ctx.shadowBlur  = 16;
         }
         ctx.fillStyle = '#bdc3c7';
         ctx.fillRect(this.x, this.y - 100, this.width, 100);
-        ctx.fillStyle = currentLevel === 3 ? '#00ffdd' : '#e1b12c';
+        ctx.fillStyle = currentLevel === 3 ? '#00ffdd' : currentLevel === 4 ? '#ff5722' : '#e1b12c';
         ctx.beginPath();
         ctx.moveTo(this.x + 10, this.y - 100);
         ctx.lineTo(this.x + 60, this.y - 80);
@@ -618,6 +912,12 @@ function makePlatform(x, y, w, h, type) {
 function makeMoving(x, y, w, h, range, speed) {
     const p = new Platform(x, y, w, h, 'moving');
     p.moveRange = range; p.moveSpeed = speed;
+    return p;
+}
+function makeConveyor(x, y, w, h, dir, speed) {
+    const p = new Platform(x, y, w, h, 'conveyor');
+    p.conveyorDir = dir;
+    p.convSpeed = speed || 1.4;
     return p;
 }
 
@@ -750,10 +1050,111 @@ function initLevel3() {
     createCoinPath(3720, 300, 4, 45);          // near final boss
 }
 
+/* ─── LEVEL 4 — VOLCANIC DEPTHS ─────────────────── */
+function initLevel4() {
+    wrapper.style.background = "linear-gradient(to bottom, #1a0000, #4a0800)";
+    platforms = []; enemies = []; coins = []; particles = [];
+    geysers = []; breakWalls = []; heatZones = []; fireTrails = []; rocks = [];
+    stalactites = []; stalagmites = []; embers = [];
+    frameCount = 0; cameraShake = 0; playerInHeat = false;
+    lavaStartY = 650; lavaY = lavaStartY;
+
+    // ── Cavern scenery (parallax layers)
+    for (let x = 60; x < 5600; x += 140 + Math.random() * 90) {
+        stalactites.push({ x, w: 26 + Math.random() * 44, h: 55 + Math.random() * 95 });
+    }
+    for (let x = 100; x < 5600; x += 210 + Math.random() * 130) {
+        stalagmites.push({ x, w: 34 + Math.random() * 46, h: 45 + Math.random() * 80 });
+    }
+    for (let i = 0; i < 80; i++) {
+        embers.push({
+            x: Math.random() * 5600,
+            y: Math.random() * 450,
+            r: 1 + Math.random() * 2.2,
+            s: 0.25 + Math.random() * 0.6,
+            ph: Math.random() * 6.28
+        });
+    }
+
+    // ── Start pad, then conveyor intro
+    platforms.push(makePlatform(0, 400, 420, 50));
+    platforms.push(makeConveyor(520, 400, 280, 30, 1, 1.6));
+
+    // ── Hop up over the first geyser ledge
+    platforms.push(makePlatform(880, 370, 110, 25));
+    platforms.push(makePlatform(1060, 330, 110, 25));
+    platforms.push(makePlatform(1230, 380, 220, 40));
+    geysers.push(new Geyser(1330, 380, 0));
+
+    // ── Fire slime arena
+    platforms.push(makePlatform(1520, 400, 460, 50));
+    enemies.push(new FireSlime(1580, 376, 170));
+    enemies.push(new FireSlime(1800, 376, 130));
+
+    // ── Breakable wall #1 → secret coin room
+    breakWalls.push(new BreakableWall(1980, 210, 40, 240));
+    platforms.push(makePlatform(2020, 400, 310, 50));
+
+    // ── Climb out (bat swarm overhead)
+    platforms.push(makePlatform(2400, 360, 100, 20));
+    platforms.push(makePlatform(2550, 310, 100, 20));
+    platforms.push(makePlatform(2700, 270, 100, 20));
+    enemies.push(new Bat(2350, 130, 320, 45, 1.6, 0));
+    enemies.push(new Bat(2500, 150, 300, 40, 1.3, 2.1));
+    enemies.push(new Bat(2650, 120, 280, 50, 1.8, 4.2));
+
+    // ── Reverse conveyor over an erupting lava geyser
+    platforms.push(makeConveyor(2860, 320, 260, 20, -1, 1.8));
+    geysers.push(new Geyser(2985, 470, 130, 230));
+
+    // ── Rock golem arena
+    platforms.push(makePlatform(3180, 360, 220, 40));
+    platforms.push(makePlatform(3440, 380, 600, 70));
+    enemies.push(new FireSlime(3480, 356, 140));
+    enemies.push(new RockGolem(3700, 328, 200));
+    geysers.push(new Geyser(3920, 380, 90));
+
+    // ── Heat zone crossing (don't linger!)
+    platforms.push(makePlatform(4090, 330, 360, 20));
+    platforms.push(makePlatform(4520, 290, 140, 20));
+    heatZones.push({ x: 4050, y: 170, w: 500, h: 260 });
+
+    // ── Breakable wall #2 → high bonus ledge
+    breakWalls.push(new BreakableWall(4660, 60, 40, 240));
+    platforms.push(makePlatform(4720, 260, 180, 20));
+
+    // ── Final stretch to the flag
+    platforms.push(makePlatform(4940, 380, 560, 70));
+    enemies.push(new Bat(4900, 190, 260, 40, 1.5, 1));
+    enemies.push(new Bat(5050, 250, 200, 55, 1.7, 3.5));
+    flag = new Flag(5340, 380);
+
+    // ── Coins
+    createCoinPath(560, 352, 4, 55);
+    createCoinPath(895, 325, 2, 45);
+    createCoinPath(1075, 285, 2, 45);
+    createCoinPath(1600, 352, 3, 55);
+    createCoinPath(2050, 355, 4, 45);   // secret room 1
+    createCoinPath(2050, 300, 2, 45);
+    createCoinPath(2420, 312, 2, 40);
+    createCoinPath(2570, 262, 2, 40);
+    createCoinPath(2720, 222, 2, 40);
+    createCoinPath(2900, 272, 4, 50);   // over the reverse conveyor
+    createCoinPath(3500, 332, 3, 55);
+    createCoinPath(3720, 320, 2, 60);   // near the golem (risky!)
+    coins.push(new Coin(4150, 285));    // heat zone corridor
+    coins.push(new Coin(4235, 285));
+    coins.push(new Coin(4320, 285));
+    coins.push(new Coin(4405, 285));
+    createCoinPath(4745, 212, 3, 42);   // secret ledge 2
+    createCoinPath(5090, 332, 3, 55);
+}
+
 function initLevel() {
     if      (currentLevel === 1) initLevel1();
     else if (currentLevel === 2) initLevel2();
-    else                         initLevel3();
+    else if (currentLevel === 3) initLevel3();
+    else                         initLevel4();
 }
 
 /* ─── HELPERS ──────────────────────────────────── */
@@ -781,6 +1182,8 @@ function checkCollisions() {
             player.y  = p.y - player.height;
             // Ride moving platform
             if (p.type === 'moving') player.x += p.moveSpeed * p.moveDir;
+            // Conveyor belt push
+            if (p.type === 'conveyor') player.x += p.conveyorDir * p.convSpeed;
             // Crumble on step
             if (p.type === 'crumble' && p.crumbleTimer === 0) p.crumbleTimer = 80;
         }
@@ -798,7 +1201,7 @@ function checkCollisions() {
                 createParticles(e.x + e.width/2, e.y + e.height/2,
                     e.tanky ? '#cc00ff' : '#e84118', 12);
                 if (e.hp <= 0) {
-                    score += e.tanky ? 150 : 50;
+                    score += e.bounty || (e.tanky ? 150 : 50);
                     scoreDisplay.innerText = "Coins: " + score;
                     createParticles(e.x + e.width/2, e.y, '#ffd700', 20);
                 } else {
@@ -818,7 +1221,7 @@ function checkCollisions() {
             c.collected = true;
             score += 10;
             scoreDisplay.innerText = "Coins: " + score;
-            createParticles(c.x, c.y, currentLevel === 3 ? '#44ffee' : '#fbc531', 5);
+            createParticles(c.x, c.y, currentLevel === 3 ? '#44ffee' : currentLevel === 4 ? '#ffca28' : '#fbc531', 5);
         }
     }
 
@@ -826,6 +1229,405 @@ function checkCollisions() {
     if (rectIntersect(player.x, player.y, player.width, player.height,
                       flag.x, flag.y - 100, flag.width + 60, flag.height)) {
         victory();
+    }
+}
+
+/* ─── LEVEL 4: VOLCANIC SYSTEMS ────────────────── */
+function updateVolcanic() {
+    frameCount++;
+
+    // Rising lava (short grace period, then relentless)
+    if (frameCount > 150 && lavaY > 40) lavaY -= LAVA_SPEED;
+
+    // Lava bubbles
+    if (frameCount % 22 === 0 && lavaY < canvas.height + 30) {
+        createParticles(cameraX + Math.random() * canvas.width, Math.min(lavaY, canvas.height - 6), '#ffca28', 2);
+    }
+
+    // Geysers: spray particles + damage while erupting
+    for (let g of geysers) {
+        if (g.isErupting()) {
+            if (frameCount % 3 === 0) {
+                createParticles(g.x + g.w / 2 + (Math.random() - 0.5) * 20,
+                                g.baseY - Math.random() * g.eruptH * 0.7, '#ff9100', 2);
+            }
+            if (player.invulnerable === 0 &&
+                rectIntersect(player.x, player.y, player.width, player.height,
+                              g.x - 4, g.baseY - g.eruptH, g.w + 8, g.eruptH)) {
+                die(); return;
+            }
+        }
+    }
+
+    // Fire slime trails
+    for (let i = fireTrails.length - 1; i >= 0; i--) {
+        const f = fireTrails[i];
+        f.life--;
+        if (f.life <= 0) { fireTrails.splice(i, 1); continue; }
+        if (player.invulnerable === 0 &&
+            rectIntersect(player.x, player.y, player.width, player.height,
+                          f.x, f.y - 4, f.w, f.h + 4)) {
+            die(); return;
+        }
+    }
+
+    // Golem rocks (gravity arc projectiles)
+    for (let i = rocks.length - 1; i >= 0; i--) {
+        const r = rocks[i];
+        r.vy += 0.35; r.x += r.vx; r.y += r.vy; r.life--;
+        if (player.invulnerable === 0 &&
+            rectIntersect(player.x, player.y, player.width, player.height,
+                          r.x - r.r, r.y - r.r, r.r * 2, r.r * 2)) {
+            die(); rocks.splice(i, 1); return;
+        }
+        if (r.life <= 0 || r.y > canvas.height + 60) {
+            createParticles(r.x, Math.min(r.y, canvas.height), '#8d6e63', 6);
+            rocks.splice(i, 1);
+        }
+    }
+
+    // Breakable walls — run into them (|vx| >= 3) to smash open
+    for (let w of breakWalls) {
+        if (!w.alive) continue;
+        if (rectIntersect(player.x, player.y, player.width, player.height,
+                          w.x, w.y, w.w, w.h)) {
+            if (Math.abs(player.vx) >= 3) {
+                w.alive = false;
+                createParticles(w.x + w.w / 2, w.y + w.h / 2, '#795548', 22);
+                createParticles(w.x + w.w / 2, w.y + w.h / 2, '#ffab73', 10);
+                cameraShake = 10;
+                score += 25;
+                scoreDisplay.innerText = "Coins: " + score;
+            } else {
+                if (player.x + player.width / 2 < w.x + w.w / 2) player.x = w.x - player.width;
+                else player.x = w.x + w.w;
+                player.vx = 0;
+            }
+        }
+    }
+
+    // Rising lava touch = instant heart loss
+    if (player.invulnerable === 0 && player.y + player.height > lavaY + 6) {
+        die(); return;
+    }
+
+    // Heat zones — lingering too long burns you
+    playerInHeat = false;
+    for (let z of heatZones) {
+        if (rectIntersect(player.x, player.y, player.width, player.height,
+                          z.x, z.y, z.w, z.h)) { playerInHeat = true; break; }
+    }
+    if (playerInHeat) player.heatMeter = Math.min(100, (player.heatMeter || 0) + 1.15);
+    else              player.heatMeter = Math.max(0,   (player.heatMeter || 0) - 2);
+    if (player.heatMeter >= 100) { die(); return; }
+}
+
+/* ─── LEVEL 4: BACKGROUND & SCENERY ────────────── */
+function drawVolcanicBackground() {
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    grad.addColorStop(0, '#1a0000');
+    grad.addColorStop(1, '#4a0800');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // distant glowing lava pools at the bottom
+    const pools = [{x: 500, r: 130},{x: 1700, r: 100},{x: 2900, r: 150},{x: 4300, r: 120},{x: 5300, r: 140}];
+    pools.forEach(p => {
+        const sx = p.x - cameraX * 0.25;
+        if (sx < -200 || sx > 1000) return;
+        const g = ctx.createRadialGradient(sx, canvas.height - 8, 0, sx, canvas.height - 8, p.r);
+        g.addColorStop(0, 'rgba(255,110,20,0.5)');
+        g.addColorStop(1, 'rgba(255,60,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(sx, canvas.height - 8, p.r, 30, 0, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // stalagmites (mid parallax layer)
+    ctx.fillStyle = '#200b06';
+    stalagmites.forEach(m => {
+        const sx = m.x - cameraX * 0.45;
+        if (sx < -120 || sx > 920) return;
+        ctx.beginPath();
+        ctx.moveTo(sx - m.w / 2, canvas.height);
+        ctx.lineTo(sx, canvas.height - m.h);
+        ctx.lineTo(sx + m.w / 2, canvas.height);
+        ctx.fill();
+    });
+
+    // stalactites (near parallax layer, glowing rim from lava below)
+    stalactites.forEach(t => {
+        const sx = t.x - cameraX * 0.75;
+        if (sx < -120 || sx > 920) return;
+        ctx.fillStyle = '#2a0f08';
+        ctx.beginPath();
+        ctx.moveTo(sx - t.w / 2, 0);
+        ctx.lineTo(sx, t.h);
+        ctx.lineTo(sx + t.w / 2, 0);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,90,20,0.18)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(sx - t.w / 2, 0);
+        ctx.lineTo(sx, t.h);
+        ctx.stroke();
+    });
+
+    // pulsing ambient orange glow from below
+    const pulse = 0.16 + 0.06 * Math.sin(frameCount * 0.03);
+    const lg = ctx.createLinearGradient(0, canvas.height - 170, 0, canvas.height);
+    lg.addColorStop(0, 'rgba(255,60,0,0)');
+    lg.addColorStop(1, 'rgba(255,80,0,' + pulse + ')');
+    ctx.fillStyle = lg;
+    ctx.fillRect(0, canvas.height - 170, canvas.width, 170);
+
+    // floating ember particles
+    ctx.save();
+    ctx.shadowColor = '#ff9100';
+    ctx.shadowBlur = 6;
+    embers.forEach(e => {
+        e.y -= e.s;
+        e.x += Math.sin(frameCount * 0.02 + e.ph) * 0.4;
+        if (e.y < -12) { e.y = 462; e.x = cameraX + Math.random() * 820; }
+        const sx = e.x - cameraX;
+        if (sx < -20 || sx > 820) return;
+        ctx.globalAlpha = 0.35 + 0.45 * (0.5 + 0.5 * Math.sin(frameCount * 0.08 + e.ph));
+        ctx.fillStyle = Math.random() < 0.15 ? '#ffe082' : '#ffb300';
+        ctx.beginPath();
+        ctx.arc(sx, e.y, e.r, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.restore();
+}
+
+/* ─── LEVEL 4: WORLD RENDERERS ─────────────────── */
+function crackPath(w) {
+    ctx.beginPath();
+    ctx.moveTo(w.x + w.w * 0.35, w.y);
+    ctx.lineTo(w.x + w.w * 0.55, w.y + w.h * 0.22);
+    ctx.lineTo(w.x + w.w * 0.30, w.y + w.h * 0.45);
+    ctx.lineTo(w.x + w.w * 0.50, w.y + w.h * 0.70);
+    ctx.lineTo(w.x + w.w * 0.40, w.y + w.h);
+    ctx.moveTo(w.x + w.w * 0.75, w.y + w.h * 0.15);
+    ctx.lineTo(w.x + w.w * 0.60, w.y + w.h * 0.50);
+    ctx.lineTo(w.x + w.w * 0.78, w.y + w.h * 0.85);
+}
+
+function drawBreakWalls() {
+    breakWalls.forEach(w => {
+        if (!w.alive) return;
+        ctx.save();
+        ctx.translate(-cameraX, 0);
+        ctx.fillStyle = '#4e2c1c';
+        ctx.fillRect(w.x, w.y, w.w, w.h);
+        ctx.fillStyle = '#5d3a26';
+        ctx.fillRect(w.x, w.y, w.w, 8);
+        ctx.strokeStyle = 'rgba(255,110,40,0.35)';
+        ctx.lineWidth = 4;
+        crackPath(w);
+        ctx.stroke();
+        ctx.strokeStyle = '#1a0a05';
+        ctx.lineWidth = 2;
+        crackPath(w);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(w.x, w.y, w.w, w.h);
+        ctx.restore();
+    });
+}
+
+function drawHeatZones() {
+    heatZones.forEach(z => {
+        const sx = z.x - cameraX;
+        if (sx + z.w < 0 || sx > 800) return;
+        ctx.save();
+        ctx.fillStyle = 'rgba(255,70,0,0.06)';
+        ctx.fillRect(sx, z.y, z.w, z.h);
+        ctx.strokeStyle = 'rgba(255,120,40,0.30)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 8]);
+        ctx.strokeRect(sx, z.y, z.w, z.h);
+        ctx.setLineDash([]);
+        // wavering heat lines
+        ctx.strokeStyle = 'rgba(255,150,60,0.14)';
+        for (let i = 0; i < 6; i++) {
+            const lx = sx + 10 + i * (z.w - 20) / 5;
+            ctx.beginPath();
+            for (let y = 0; y <= z.h; y += 12) {
+                ctx.lineTo(lx + Math.sin((y + frameCount * 3) * 0.06 + i * 1.3) * 4, z.y + y);
+            }
+            ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(255,180,80,0.55)';
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText('HEAT ZONE', sx + 12, z.y + 20);
+        ctx.restore();
+    });
+}
+
+function drawFireTrails() {
+    fireTrails.forEach(f => {
+        const a = Math.max(0, f.life / 110);
+        const sx = f.x - cameraX;
+        if (sx < -30 || sx > 830) return;
+        const fl = 1 + 0.25 * Math.sin(frameCount * 0.6 + f.x);
+        ctx.save();
+        ctx.globalAlpha = a * 0.95;
+        ctx.shadowColor = '#ff9100';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#ff5722';
+        ctx.beginPath();
+        ctx.ellipse(sx + f.w / 2, f.y + f.h, f.w / 2, (f.h + 4) * fl, 0, Math.PI, 0);
+        ctx.fill();
+        ctx.fillStyle = '#ffca28';
+        ctx.beginPath();
+        ctx.ellipse(sx + f.w / 2, f.y + f.h, f.w / 3.2, f.h * fl, 0, Math.PI, 0);
+        ctx.fill();
+        ctx.restore();
+    });
+}
+
+function drawRocks() {
+    rocks.forEach(r => {
+        ctx.save();
+        ctx.translate(-cameraX, 0);
+        ctx.fillStyle = '#6d4c41';
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#4e342e';
+        ctx.beginPath();
+        ctx.arc(r.x - r.r * 0.3, r.y - r.r * 0.3, r.r * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 0.5;
+        ctx.strokeStyle = '#ff8a50';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(r.x - 3, r.y - 2);
+        ctx.lineTo(r.x + 2, r.y + 3);
+        ctx.stroke();
+        ctx.restore();
+    });
+}
+
+function drawGeysers() {
+    geysers.forEach(g => {
+        const sx = g.x - cameraX;
+        if (sx < -80 || sx > 880) return;
+        const cx = sx + g.w / 2;
+        // vent opening
+        ctx.fillStyle = '#170701';
+        ctx.beginPath();
+        ctx.ellipse(cx, g.baseY, g.w / 2 + 5, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        if (g.isWarning()) {
+            const k = (g.phase() - 170) / (GEYSER_ERUPT_START - 170);
+            ctx.save();
+            ctx.shadowColor = '#ff9100';
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = 'rgba(255,' + (140 + Math.floor(80 * Math.sin(frameCount * 0.6))) + ',20,0.9)';
+            ctx.beginPath();
+            ctx.arc(cx, g.baseY - 5, 5 + k * 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+        if (g.isErupting()) {
+            const h = g.eruptH * (0.92 + 0.08 * Math.sin(frameCount * 0.7 + g.offset));
+            ctx.save();
+            ctx.shadowColor = '#ff5722';
+            ctx.shadowBlur = 20;
+            const layers = [
+                { w: g.w + 12, c: 'rgba(255,61,0,0.85)' },
+                { w: g.w - 2,  c: 'rgba(255,145,0,0.9)' },
+                { w: Math.max(8, g.w - 16), c: 'rgba(255,234,0,0.95)' }
+            ];
+            layers.forEach((L, i) => {
+                const wob = Math.sin(frameCount * 0.5 + i * 1.7) * 3;
+                const lx = cx - L.w / 2 + wob * 0.3;
+                const ly = g.baseY - h;
+                ctx.fillStyle = L.c;
+                ctx.beginPath();
+                ctx.moveTo(lx, g.baseY);
+                ctx.lineTo(lx, ly + 8);
+                ctx.quadraticCurveTo(cx + wob * 0.3, ly - 12, lx + L.w, ly + 8);
+                ctx.lineTo(lx + L.w, g.baseY);
+                ctx.closePath();
+                ctx.fill();
+            });
+            ctx.restore();
+        }
+    });
+}
+
+function drawLava() {
+    const ly = lavaY;
+    // glow cast upward from the lava
+    const glow = ctx.createLinearGradient(0, ly - 110, 0, ly);
+    glow.addColorStop(0, 'rgba(255,60,0,0)');
+    glow.addColorStop(1, 'rgba(255,90,20,0.35)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, ly - 110, canvas.width, 110);
+    // layered undulating surface
+    const waves = [
+        { amp: 4, sp: 0.07,  col: '#ff6a00', a: 1,   dy: 0 },
+        { amp: 6, sp: 0.045, col: '#ff9500', a: 0.7, dy: 4 },
+        { amp: 3, sp: 0.11,  col: '#ffe082', a: 0.5, dy: 2 }
+    ];
+    waves.forEach(wv => {
+        ctx.save();
+        ctx.globalAlpha = wv.a;
+        ctx.fillStyle = wv.col;
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height);
+        for (let x = 0; x <= canvas.width; x += 16) {
+            ctx.lineTo(x, ly + wv.dy + Math.sin((x + frameCount * 2.2) * wv.sp * 1.4) * wv.amp);
+        }
+        ctx.lineTo(canvas.width, canvas.height);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    });
+    // deep dark gradient into the depths
+    const deep = ctx.createLinearGradient(0, ly, 0, canvas.height);
+    deep.addColorStop(0, 'rgba(120,10,0,0)');
+    deep.addColorStop(1, 'rgba(40,0,0,0.55)');
+    ctx.fillStyle = deep;
+    ctx.fillRect(0, ly, canvas.width, canvas.height - ly);
+}
+
+function drawLevel4UI() {
+    // full-screen heat shimmer while inside a heat zone
+    if (playerInHeat && gameRunning) {
+        ctx.save();
+        ctx.globalAlpha = 0.05 + 0.03 * Math.sin(frameCount * 0.35);
+        ctx.fillStyle = '#ff6d00';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 0.10;
+        ctx.strokeStyle = '#ffcc80';
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 4; i++) {
+            const yBase = 60 + i * 110 + Math.sin(frameCount * 0.1 + i) * 12;
+            ctx.beginPath();
+            for (let x = 0; x <= canvas.width; x += 24) {
+                ctx.lineTo(x, yBase + Math.sin(x * 0.03 + frameCount * 0.22 + i * 2) * 7);
+            }
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+    // heat meter above the player
+    const hm = player.heatMeter || 0;
+    if (hm > 0 && !player.isDead) {
+        const px = player.x - cameraX + player.width / 2;
+        const py = player.y - 16;
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(px - 20, py, 40, 6);
+        ctx.fillStyle = hm < 55 ? '#ffd54f' : hm < 85 ? '#ff9100' : '#ff3d00';
+        ctx.fillRect(px - 19, py + 1, 38 * hm / 100, 4);
+        ctx.restore();
     }
 }
 
@@ -843,6 +1645,13 @@ function die() {
                 if (p.type === 'crumble') { p.alive = true; p.crumbleTimer = 0; }
             }
         }
+        // Reset volcanic hazards on respawn
+        if (currentLevel === 4) {
+            lavaY = lavaStartY;
+            fireTrails.length = 0;
+            rocks.length = 0;
+            player.heatMeter = 0;
+        }
     } else {
         gameOver();
     }
@@ -856,7 +1665,7 @@ function gameOver() {
 
 function victory() {
     gameRunning = false;
-    if (currentLevel < 3) {
+    if (currentLevel < 4) {
         showTransition(currentLevel + 1);
     } else {
         victoryScoreText.innerText = "Total Coins: " + score;
@@ -865,8 +1674,8 @@ function victory() {
 }
 
 function showTransition(nextLevel) {
-    const names    = { 2: 'SUNSET HORIZON', 3: '⭐ SPACE FRONTIER ⭐' };
-    const bonuses  = { 2: '+1 Extra Heart!', 3: '+1 Extra Heart!' };
+    const names    = { 2: 'SUNSET HORIZON', 3: '⭐ SPACE FRONTIER ⭐', 4: 'VOLCANIC DEPTHS' };
+    const bonuses  = { 2: '+1 Extra Heart!', 3: '+1 Extra Heart!', 4: '+1 Extra Heart!' };
     levelTitle.innerText    = names[nextLevel];
     levelSubtitle.innerText = 'Level ' + nextLevel;
     levelBonus.innerText    = bonuses[nextLevel];
@@ -914,15 +1723,22 @@ function update() {
     coins.forEach(c => c.update());
     particles.forEach((p, i) => { p.update(); if (p.life <= 0) particles.splice(i, 1); });
     checkCollisions();
+    if (currentLevel === 4) updateVolcanic();
     let targetCamX = player.x - canvas.width / 3;
     if (targetCamX < 0) targetCamX = 0;
-    const maxCam = currentLevel === 1 ? 5000 : currentLevel === 2 ? 3500 : 3800;
+    const maxCam = currentLevel === 1 ? 5000 : currentLevel === 2 ? 3500 : currentLevel === 3 ? 3800 : 4800;
     if (targetCamX > maxCam) targetCamX = maxCam;
     cameraX = targetCamX;
+    if (cameraShake > 0) {
+        cameraX += (Math.random() - 0.5) * cameraShake;
+        cameraShake--;
+    }
 }
 
 function drawBackground() {
-    if (currentLevel === 3) {
+    if (currentLevel === 4) {
+        drawVolcanicBackground();
+    } else if (currentLevel === 3) {
         // Deep space gradient redrawn each frame for parallax
         const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
         grad.addColorStop(0, '#000010');
@@ -957,10 +1773,13 @@ function draw() {
     drawBackground();
     flag.draw();
     platforms.forEach(p => p.draw());
+    if (currentLevel === 4) { drawBreakWalls(); drawHeatZones(); drawFireTrails(); }
     coins.forEach(c => c.draw());
     enemies.forEach(e => e.draw());
+    if (currentLevel === 4) drawRocks();
     player.draw();
     particles.forEach(p => p.draw());
+    if (currentLevel === 4) { drawGeysers(); drawLava(); drawLevel4UI(); }
 }
 
 function gameLoop() {
